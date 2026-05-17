@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import { useUser } from '@/hooks/useUser'
 import { useCalendar } from '@/hooks/useCalendar'
 import { useTasks } from '@/hooks/useTasks'
@@ -162,7 +162,7 @@ function EventModal({
 }
 
 // ─── Day Cell ─────────────────────────────────────────────────
-function DayCell({
+const DayCell = React.memo(function DayCell({
   date, isCurrentMonth, isToday, events, tasksDue, selected, onClick
 }: {
   date: Date; isCurrentMonth: boolean; isToday: boolean
@@ -209,7 +209,7 @@ function DayCell({
       </div>
     </div>
   )
-}
+})
 
 // ─── Calendar Page ────────────────────────────────────────────
 export default function CalendarPage() {

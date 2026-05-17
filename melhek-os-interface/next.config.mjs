@@ -16,6 +16,12 @@ const nextConfig = {
     unoptimized: true,
   },
   allowedDevOrigins: ['localhost', '10.216.182.75'],
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
 }
 
 export default withSerwist(nextConfig)
