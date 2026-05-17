@@ -1,33 +1,67 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { getInitials } from '@/lib/utils'
-import { Loader2, Save, Key, User, Globe } from 'lucide-react'
+import { Loader2, Save, Key, User, Globe, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 
 const TIMEZONES = [
   'Africa/Addis_Ababa', 'Africa/Nairobi', 'UTC',
-  'Europe/London', 'America/New_York', 'America/Los_Angeles', 'Asia/Dubai',
+  'Europe/London', 'America/New_York', 'America/Los_Angeles',
+  'Asia/Dubai', 'Asia/Kolkata', 'Asia/Tokyo',
 ]
+
+function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="glass rounded-2xl overflow-hidden">
+      <div className="px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <h2 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--melhek-text-primary)' }}>
+          <span className="opacity-60">{icon}</span> {title}
+        </h2>
+      </div>
+      <div className="px-6 py-5">{children}</div>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium uppercase tracking-wider block"
+        style={{ color: 'var(--melhek-text-tertiary)' }}>{label}</label>
+      {children}
+    </div>
+  )
+}
+
+const INPUT = {
+  className: 'w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none transition-all',
+  style: { background: 'var(--melhek-bg-3)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--melhek-text-primary)' } as React.CSSProperties,
+}
 
 export default function SettingsPage() {
   const { profile, loading } = useUser()
-  const supabase = createClient()
+  const supabase = useRef(createClient()).current
+
+  // ─── Form state ─────────────────────────────────────────────
   const [fullName, setFullName] = useState('')
-  const [timezone, setTimezone] = useState('')
-  const [savingProfile, setSavingProfile] = useState(false)
-  const [currentPassword, setCurrentPassword] = useState('')
+  const [timezone, setTimezone] = useState('Africa/Addis_Ababa')
   const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
 
-  // Init form when profile loads
-  if (profile && !fullName && !timezone) {
-    setFullName(profile.full_name)
-    setTimezone(profile.timezone)
-  }
+  // ─── Sync form when profile loads (useEffect, not render body) ─
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name)
+      setTimezone(profile.timezone ?? 'Africa/Addis_Ababa')
+    }
+  }, [profile])
 
+  // ─── Save profile ────────────────────────────────────────────
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!profile || !fullName.trim()) return
@@ -36,118 +70,145 @@ export default function SettingsPage() {
       .from('profiles')
       .update({ full_name: fullName.trim(), timezone })
       .eq('id', profile.id)
-    if (error) toast.error('Failed to save profile')
-    else toast.success('Profile updated')
+    if (error) toast.error('Failed to save: ' + error.message)
+    else toast.success('Profile saved')
     setSavingProfile(false)
   }
 
+  // ─── Change password ─────────────────────────────────────────
   const savePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newPassword || newPassword.length < 8) {
+    if (newPassword.length < 8) {
       toast.error('Password must be at least 8 characters')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match')
       return
     }
     setSavingPassword(true)
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) toast.error(error.message)
-    else { toast.success('Password updated'); setCurrentPassword(''); setNewPassword('') }
+    else {
+      toast.success('Password updated')
+      setNewPassword('')
+      setConfirmPassword('')
+    }
     setSavingPassword(false)
   }
 
+  // ─── Loading state ───────────────────────────────────────────
   if (loading) {
     return (
-      <div className="p-8 flex items-center gap-3" style={{ color: 'var(--melhek-text-tertiary)' }}>
-        <Loader2 className="w-5 h-5 animate-spin" /> Loading…
+      <div className="p-8 space-y-4 max-w-2xl">
+        <div className="h-8 w-32 shimmer rounded" />
+        {[...Array(2)].map((_, i) => <div key={i} className="h-48 shimmer rounded-2xl" />)}
       </div>
     )
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-2xl space-y-8 pb-12">
+    <div className="p-6 lg:p-8 max-w-2xl space-y-6 pb-12 overflow-y-auto h-full">
+      {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--melhek-text-primary)' }}>Settings</h1>
-        <p className="text-sm mt-0.5" style={{ color: 'var(--melhek-text-tertiary)' }}>Manage your account and preferences</p>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--melhek-text-primary)' }}>
+          Settings
+        </h1>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--melhek-text-tertiary)' }}>
+          Manage your account and preferences
+        </p>
       </div>
 
-      {/* Profile Section */}
-      <div className="glass rounded-2xl overflow-hidden">
-        <div className="px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <h2 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--melhek-text-primary)' }}>
-            <User className="w-4 h-4 opacity-60" /> Profile
-          </h2>
-        </div>
-        <form onSubmit={saveProfile} className="px-6 py-5 space-y-4">
+      {/* ─── Profile Section ─────────────────────────────────── */}
+      <Section title="Profile" icon={<User className="w-4 h-4" />}>
+        <form onSubmit={saveProfile} className="space-y-4">
           {/* Avatar preview */}
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00D4FF] to-[#0080FF] flex items-center justify-center text-xl font-bold text-black">
+          <div className="flex items-center gap-4 pb-2">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold text-black flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg,#00D4FF,#0080FF)' }}>
               {profile ? getInitials(profile.full_name) : '?'}
             </div>
             <div>
-              <p className="text-sm font-medium" style={{ color: 'var(--melhek-text-primary)' }}>{profile?.full_name}</p>
-              <p className="text-xs capitalize" style={{ color: 'var(--melhek-text-tertiary)' }}>{profile?.role}</p>
+              <p className="text-sm font-semibold" style={{ color: 'var(--melhek-text-primary)' }}>
+                {profile?.full_name}
+              </p>
+              <p className="text-xs capitalize mt-0.5" style={{ color: 'var(--melhek-text-tertiary)' }}>
+                {profile?.role} · Melhek OS
+              </p>
             </div>
           </div>
 
-          {/* Name */}
-          <div>
-            <label className="text-xs font-medium uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--melhek-text-tertiary)' }}>Full Name</label>
-            <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} required
-              className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
-              style={{ background: 'var(--melhek-bg-3)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--melhek-text-primary)' }}
+          <Field label="Full Name">
+            <input
+              type="text" value={fullName} onChange={e => setFullName(e.target.value)} required
+              {...INPUT}
+              onFocus={e => (e.currentTarget.style.borderColor = 'rgba(0,128,255,0.5)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
             />
-          </div>
+          </Field>
 
-          {/* Timezone */}
-          <div>
-            <label className="text-xs font-medium uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--melhek-text-tertiary)' }}>
-              <div className="flex items-center gap-1"><Globe className="w-3 h-3" /> Timezone</div>
-            </label>
-            <select value={timezone} onChange={e => setTimezone(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
-              style={{ background: 'var(--melhek-bg-3)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--melhek-text-primary)' }}>
+          <Field label="Timezone">
+            <select value={timezone} onChange={e => setTimezone(e.target.value)} {...INPUT}>
               {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
             </select>
-          </div>
+          </Field>
 
           <button type="submit" disabled={savingProfile}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-black transition-all press-scale disabled:opacity-60"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-black press-scale disabled:opacity-60 transition-all"
             style={{ background: 'linear-gradient(135deg,#0080FF,#00D4FF)' }}>
             {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save Profile
           </button>
         </form>
-      </div>
+      </Section>
 
-      {/* Password Section */}
-      <div className="glass rounded-2xl overflow-hidden">
-        <div className="px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <h2 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--melhek-text-primary)' }}>
-            <Key className="w-4 h-4 opacity-60" /> Change Password
-          </h2>
-        </div>
-        <form onSubmit={savePassword} className="px-6 py-5 space-y-4">
-          <div>
-            <label className="text-xs font-medium uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--melhek-text-tertiary)' }}>New Password</label>
-            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+      {/* ─── Password Section ─────────────────────────────────── */}
+      <Section title="Change Password" icon={<Key className="w-4 h-4" />}>
+        <form onSubmit={savePassword} className="space-y-4">
+          <Field label="New Password">
+            <input
+              type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
               placeholder="Min. 8 characters" minLength={8}
-              className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
-              style={{ background: 'var(--melhek-bg-3)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--melhek-text-primary)' }}
+              {...INPUT}
+              onFocus={e => (e.currentTarget.style.borderColor = 'rgba(0,128,255,0.5)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
             />
-          </div>
-          <button type="submit" disabled={savingPassword || newPassword.length < 8}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-black transition-all press-scale disabled:opacity-60"
+          </Field>
+
+          <Field label="Confirm Password">
+            <input
+              type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+              placeholder="Repeat new password"
+              {...INPUT}
+              style={{
+                ...INPUT.style,
+                borderColor: confirmPassword && confirmPassword !== newPassword
+                  ? 'rgba(255,68,68,0.5)' : 'rgba(255,255,255,0.08)',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = 'rgba(0,128,255,0.5)')}
+              onBlur={e => (e.currentTarget.style.borderColor =
+                confirmPassword && confirmPassword !== newPassword ? 'rgba(255,68,68,0.5)' : 'rgba(255,255,255,0.08)')}
+            />
+            {confirmPassword && confirmPassword !== newPassword && (
+              <p className="text-xs mt-1" style={{ color: '#ff6666' }}>Passwords do not match</p>
+            )}
+          </Field>
+
+          <button type="submit"
+            disabled={savingPassword || newPassword.length < 8 || newPassword !== confirmPassword}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-black press-scale disabled:opacity-60 transition-all"
             style={{ background: 'linear-gradient(135deg,#0080FF,#00D4FF)' }}>
-            {savingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+            {savingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
             Update Password
           </button>
         </form>
-      </div>
+      </Section>
 
-      {/* About */}
-      <div className="glass rounded-2xl px-6 py-5">
+      {/* ─── About ───────────────────────────────────────────── */}
+      <div className="glass rounded-2xl px-6 py-4">
         <div className="flex items-center justify-between text-xs" style={{ color: 'var(--melhek-text-tertiary)' }}>
-          <span>Melhek OS · Internal Productivity System</span>
-          <span>v1.0.0</span>
+          <span>Melhek OS · Internal Productivity Platform</span>
+          <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(0,128,255,0.1)', color: '#0080FF' }}>v1.0.0</span>
         </div>
       </div>
     </div>

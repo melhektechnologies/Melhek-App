@@ -9,7 +9,12 @@ import type { AIConversation, ChatMessage } from '@/types'
 
 export default function AIPage() {
   const { profile } = useUser()
-  const supabase = createClient()
+  const supabase = useRef(createClient()).current
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const [conversations, setConversations] = useState<AIConversation[]>([])
   const [activeConvId, setActiveConvId] = useState<string | null>(null)
@@ -22,15 +27,17 @@ export default function AIPage() {
 
   // Load conversations
   const loadConversations = useCallback(async () => {
-    if (!profile) return
+    if (!profile || !mounted.current) return
     const { data } = await supabase
       .from('ai_conversations')
       .select('*')
       .eq('user_id', profile.id)
       .order('updated_at', { ascending: false })
       .limit(20)
-    setConversations((data as AIConversation[]) ?? [])
-    setLoadingConvs(false)
+    if (mounted.current) {
+      setConversations((data as AIConversation[]) ?? [])
+      setLoadingConvs(false)
+    }
   }, [profile, supabase])
 
   useEffect(() => { loadConversations() }, [loadConversations])
