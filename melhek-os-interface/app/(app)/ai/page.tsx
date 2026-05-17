@@ -263,8 +263,8 @@ export default function AIPage() {
               No conversations yet
             </p>
           ) : conversations.map(conv => (
-            <button key={conv.id} onClick={() => setActiveConvId(conv.id)}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left transition-all group"
+            <div key={conv.id} onClick={() => setActiveConvId(conv.id)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left transition-all group cursor-pointer"
               style={{ background: activeConvId === conv.id ? 'rgba(0,128,255,0.12)' : 'transparent' }}>
               <Bot className="w-3.5 h-3.5 flex-shrink-0"
                 style={{ color: activeConvId === conv.id ? '#00D4FF' : 'var(--melhek-text-tertiary)' }} />
@@ -279,7 +279,7 @@ export default function AIPage() {
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--melhek-text-tertiary)')}>
                 <Trash2 className="w-3 h-3" />
               </button>
-            </button>
+            </div>
           ))}
         </div>
 
