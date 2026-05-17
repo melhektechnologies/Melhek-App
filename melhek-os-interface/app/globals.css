@@ -263,3 +263,35 @@
     @apply text-xs font-normal text-melhek-text-tertiary;
   }
 }
+
+/* ============ MARKDOWN PREVIEW STYLES ============ */
+.prose-melhek .md-h1 { font-size: 1.5rem; font-weight: 700; color: var(--melhek-text-primary); margin: 1.2rem 0 0.6rem; line-height: 1.3; }
+.prose-melhek .md-h2 { font-size: 1.2rem; font-weight: 600; color: var(--melhek-text-primary); margin: 1rem 0 0.5rem; }
+.prose-melhek .md-h3 { font-size: 1rem; font-weight: 600; color: var(--melhek-text-secondary); margin: 0.8rem 0 0.4rem; }
+.prose-melhek .md-p  { margin: 0.5rem 0; color: var(--melhek-text-secondary); }
+.prose-melhek .md-bold { color: var(--melhek-text-primary); font-weight: 600; }
+.prose-melhek .md-em   { font-style: italic; color: var(--melhek-text-secondary); }
+.prose-melhek .md-del  { text-decoration: line-through; opacity: 0.5; }
+.prose-melhek .md-link { color: #00D4FF; text-decoration: underline; text-underline-offset: 3px; }
+.prose-melhek .md-link:hover { color: #0080FF; }
+.prose-melhek .md-img  { max-width: 100%; border-radius: 0.5rem; margin: 0.75rem 0; border: 1px solid rgba(255,255,255,0.08); }
+.prose-melhek .md-inline-code {
+  font-family: 'Geist Mono', monospace; font-size: 0.8em;
+  background: rgba(0,128,255,0.12); color: #00D4FF;
+  padding: 0.1em 0.4em; border-radius: 4px; border: 1px solid rgba(0,128,255,0.2);
+}
+.prose-melhek .md-pre {
+  background: rgba(10,10,20,0.8); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 0.75rem; padding: 1rem; overflow-x: auto; margin: 0.75rem 0;
+}
+.prose-melhek .md-code { font-family: 'Geist Mono', monospace; font-size: 0.82em; color: #a0e0ff; }
+.prose-melhek .md-ul, .prose-melhek .md-ol { padding-left: 1.4rem; margin: 0.5rem 0; }
+.prose-melhek .md-li, .prose-melhek .md-oli { color: var(--melhek-text-secondary); margin: 0.25rem 0; }
+.prose-melhek .md-ul { list-style-type: disc; }
+.prose-melhek .md-ol { list-style-type: decimal; }
+.prose-melhek .md-blockquote {
+  border-left: 3px solid rgba(0,128,255,0.5); padding-left: 1rem; margin: 0.75rem 0;
+  color: var(--melhek-text-tertiary); font-style: italic;
+}
+.prose-melhek .md-hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 1.2rem 0; }
+

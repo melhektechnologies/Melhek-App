@@ -78,6 +78,21 @@ export interface AIConversation {
   updated_at: string
 }
 
+// ─── Note ────────────────────────────────────────────────────
+export interface Note {
+  id: string
+  user_id: string
+  project_id: string | null
+  title: string
+  content: string
+  tags: string[]
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+  // Joined
+  project?: Pick<Project, 'id' | 'name' | 'color' | 'icon'> | null
+}
+
 // ─── Dashboard Stats ────────────────────────────────────────
 export interface DashboardStats {
   tasksDueToday: number

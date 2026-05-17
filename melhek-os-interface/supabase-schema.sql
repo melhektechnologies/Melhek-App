@@ -107,6 +107,37 @@ CREATE POLICY "tasks_authenticated" ON public.tasks FOR ALL USING (auth.role() =
 -- AI Conversations: users see only their own
 CREATE POLICY "ai_convs_own" ON public.ai_conversations FOR ALL USING (auth.uid() = user_id);
 
+-- ─── TABLE: notes ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.notes (
+  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id     uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  project_id  uuid REFERENCES public.projects(id) ON DELETE SET NULL,
+  title       text NOT NULL DEFAULT 'Untitled Note',
+  content     text NOT NULL DEFAULT '',
+  tags        text[] NOT NULL DEFAULT '{}',
+  is_pinned   boolean NOT NULL DEFAULT false,
+  created_at  timestamptz DEFAULT now() NOT NULL,
+  updated_at  timestamptz DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS notes_user_idx       ON public.notes(user_id);
+CREATE INDEX IF NOT EXISTS notes_project_idx    ON public.notes(project_id);
+CREATE INDEX IF NOT EXISTS notes_pinned_idx     ON public.notes(is_pinned);
+CREATE INDEX IF NOT EXISTS notes_updated_idx    ON public.notes(updated_at DESC);
+-- Full-text search index on title + content
+CREATE INDEX IF NOT EXISTS notes_fts_idx ON public.notes
+  USING gin(to_tsvector('english', coalesce(title,'') || ' ' || coalesce(content,'')));
+
+ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "notes_own" ON public.notes;
+CREATE POLICY "notes_own" ON public.notes FOR ALL USING (auth.uid() = user_id);
+
+-- ─── STORAGE: note-attachments bucket ────────────────────────
+-- Run this separately in the Supabase Storage tab or via the SQL editor:
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('note-attachments', 'note-attachments', false) ON CONFLICT DO NOTHING;
+-- DROP POLICY IF EXISTS "note_attach_auth" ON storage.objects;
+-- CREATE POLICY "note_attach_auth" ON storage.objects FOR ALL USING (auth.role() = 'authenticated' AND bucket_id = 'note-attachments');
+
 -- ─── DONE ────────────────────────────────────────────────────
 -- After running this script:
 -- 1. Create a user in Supabase Auth Dashboard (Authentication > Users > Add user)
@@ -114,3 +145,4 @@ CREATE POLICY "ai_convs_own" ON public.ai_conversations FOR ALL USING (auth.uid(
 -- 3. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local
 -- 4. Set ANTHROPIC_API_KEY in .env.local
 -- 5. Run: npm run dev
+-- 6. In Supabase Storage tab: create bucket named "note-attachments" (private)

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, CheckSquare, FolderKanban,
-  MessageSquareCode, Settings, HelpCircle, LogOut, Zap
+  MessageSquareCode, Settings, HelpCircle, LogOut, Zap, FileText
 } from 'lucide-react'
 import { useUser } from '@/hooks/useUser'
 import { getInitials } from '@/lib/utils'
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
   { icon: CheckSquare, label: 'Tasks', href: '/tasks' },
   { icon: FolderKanban, label: 'Projects', href: '/projects' },
+  { icon: FileText, label: 'Notes', href: '/notes' },
   { icon: MessageSquareCode, label: 'AI Assistant', href: '/ai' },
 ]
 
