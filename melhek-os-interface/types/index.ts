@@ -100,3 +100,34 @@ export interface DashboardStats {
   activeProjects: number
   totalTasks: number
 }
+
+// ─── Calendar ────────────────────────────────────────────────
+export type EventType = 'meeting' | 'reminder' | 'deadline' | 'block'
+
+export interface CalendarEvent {
+  id: string
+  user_id: string
+  title: string
+  description: string | null
+  type: EventType
+  start_at: string
+  end_at: string
+  all_day: boolean
+  color: string | null
+  project_id: string | null
+  task_id: string | null
+  created_at: string
+  updated_at: string
+  // Joined
+  project?: Pick<Project, 'id' | 'name' | 'color' | 'icon'> | null
+}
+
+// Synthetic task-due events merged into calendar
+export interface CalendarDay {
+  date: Date
+  isCurrentMonth: boolean
+  isToday: boolean
+  events: CalendarEvent[]
+  tasksDue: { id: string; title: string; priority: TaskPriority }[]
+}
+

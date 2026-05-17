@@ -138,6 +138,31 @@ CREATE POLICY "notes_own" ON public.notes FOR ALL USING (auth.uid() = user_id);
 -- DROP POLICY IF EXISTS "note_attach_auth" ON storage.objects;
 -- CREATE POLICY "note_attach_auth" ON storage.objects FOR ALL USING (auth.role() = 'authenticated' AND bucket_id = 'note-attachments');
 
+-- ─── TABLE: calendar_events ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.calendar_events (
+  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id     uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  title       text NOT NULL,
+  description text,
+  type        text NOT NULL DEFAULT 'meeting' CHECK (type IN ('meeting', 'reminder', 'deadline', 'block')),
+  start_at    timestamptz NOT NULL,
+  end_at      timestamptz NOT NULL,
+  all_day     boolean NOT NULL DEFAULT false,
+  color       text,
+  project_id  uuid REFERENCES public.projects(id) ON DELETE SET NULL,
+  task_id     uuid REFERENCES public.tasks(id) ON DELETE CASCADE,
+  created_at  timestamptz DEFAULT now() NOT NULL,
+  updated_at  timestamptz DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS cal_events_user_idx    ON public.calendar_events(user_id);
+CREATE INDEX IF NOT EXISTS cal_events_start_idx   ON public.calendar_events(start_at);
+CREATE INDEX IF NOT EXISTS cal_events_task_idx    ON public.calendar_events(task_id);
+
+ALTER TABLE public.calendar_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "cal_events_own" ON public.calendar_events;
+CREATE POLICY "cal_events_own" ON public.calendar_events FOR ALL USING (auth.uid() = user_id);
+
 -- ─── DONE ────────────────────────────────────────────────────
 -- After running this script:
 -- 1. Create a user in Supabase Auth Dashboard (Authentication > Users > Add user)
@@ -146,3 +171,4 @@ CREATE POLICY "notes_own" ON public.notes FOR ALL USING (auth.uid() = user_id);
 -- 4. Set ANTHROPIC_API_KEY in .env.local
 -- 5. Run: npm run dev
 -- 6. In Supabase Storage tab: create bucket named "note-attachments" (private)
+-- 7. Run calendar_events table block above in SQL editor
