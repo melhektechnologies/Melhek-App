@@ -2,6 +2,7 @@
 
 import { useUser } from '@/hooks/useUser'
 import { AppSidebar } from '@/components/layout/AppSidebar'
+import CommandPalette from '@/components/layout/CommandPalette'
 import { AppTopbar } from '@/components/layout/AppTopbar'
 import { GridBackground } from '@/components/melhek/grid-background'
 import { Loader2 } from 'lucide-react'
@@ -34,6 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      <CommandPalette />
     </div>
   )
 }
