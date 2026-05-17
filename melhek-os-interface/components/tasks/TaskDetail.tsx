@@ -282,7 +282,6 @@ export function TaskDetail({ task, projects, onUpdate, onDelete, onClose }: Prop
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            onBlur={saveDescription}
             rows={5}
             placeholder="Add notes, context, or links…"
             className="w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none resize-none leading-relaxed transition-all"
@@ -292,7 +291,10 @@ export function TaskDetail({ task, projects, onUpdate, onDelete, onClose }: Prop
               color: 'var(--melhek-text-primary)',
             }}
             onFocus={e => (e.currentTarget.style.borderColor = 'rgba(0,128,255,0.4)')}
-            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+            onBlur={e => {
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+              saveDescription()
+            }}
           />
         </div>
 

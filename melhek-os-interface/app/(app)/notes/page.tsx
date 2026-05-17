@@ -63,7 +63,7 @@ export default function NotesPage() {
   const [saving, setSaving] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout>>()
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ─── Derived ───────────────────────────────────────────────
@@ -93,7 +93,7 @@ export default function NotesPage() {
 
   // ─── Autosave debounce ────────────────────────────────────
   const scheduleAutosave = useCallback((id: string, t: string, c: string) => {
-    clearTimeout(autosaveTimer.current)
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     autosaveTimer.current = setTimeout(async () => {
       setSaving(true)
       await updateNote(id, { title: t || 'Untitled Note', content: c })
