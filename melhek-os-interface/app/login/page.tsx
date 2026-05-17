@@ -37,8 +37,8 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-md px-6">
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0080FF] to-[#00D4FF] flex items-center justify-center mb-4 shadow-[0_0_40px_rgba(0,128,255,0.4)]">
-            <Zap className="w-7 h-7 text-black" />
+          <div className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(0,128,255,0.4)] border border-white/10">
+            <img src="/logo.jpg" alt="Melhek Logo" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--melhek-text-primary)' }}>
             Melhek OS

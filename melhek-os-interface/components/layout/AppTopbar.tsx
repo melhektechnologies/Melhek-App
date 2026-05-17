@@ -47,8 +47,13 @@ export function AppTopbar({ profile }: { profile: Profile | null }) {
       className="h-14 px-6 flex items-center justify-between gap-4 flex-shrink-0 relative z-20"
       style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(10,10,20,0.6)', backdropFilter: 'blur(12px)' }}
     >
+      {/* Mobile Logo */}
+      <div className="sm:hidden w-8 h-8 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center shadow-[0_0_20px_rgba(0,128,255,0.3)] border border-white/10">
+        <img src="/logo.jpg" alt="Melhek Logo" className="w-full h-full object-cover" />
+      </div>
+
       {/* Search */}
-      <div className="flex-1 max-w-md relative">
+      <div className="flex-1 max-w-md relative ml-2 sm:ml-0">
         <div className="relative">
           {searching
             ? <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" style={{ color: 'var(--melhek-text-tertiary)' }} />

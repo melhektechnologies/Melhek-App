@@ -41,8 +41,8 @@ export function AppSidebar({ profile }: { profile: Profile | null }) {
       {/* Logo */}
       <div className="px-4 py-5" style={{ borderBottom: '1px solid rgba(0,128,255,0.1)' }}>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#0080FF] to-[#00D4FF] flex items-center justify-center shadow-[0_0_20px_rgba(0,128,255,0.3)]">
-            <Zap className="w-4 h-4 text-black" />
+          <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shadow-[0_0_20px_rgba(0,128,255,0.3)] border border-white/10">
+            <img src="/logo.jpg" alt="Melhek Logo" className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="text-sm font-bold tracking-tight" style={{ color: 'var(--melhek-text-primary)' }}>
