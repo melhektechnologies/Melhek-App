@@ -35,7 +35,7 @@ export function AppSidebar({ profile }: { profile: Profile | null }) {
 
   return (
     <div
-      className="w-64 flex flex-col flex-shrink-0 glass depth-2"
+      className="hidden sm:flex w-64 flex-col flex-shrink-0 glass depth-2"
       style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}
     >
       {/* Logo */}
