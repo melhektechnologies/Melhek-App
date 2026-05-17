@@ -1,0 +1,478 @@
+
+<h2 class="sr-only">Melhek OS V1 MVP blueprint — interactive build tracker showing tech stack, database schema, pages, and 3-week timeline</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+--navy:rgba(1,1,51,0.06);
+--teal:rgba(1,42,45,0.08);
+--cyan:#0891b2;
+--green:#059669;
+--amber:#d97706;
+--red:#dc2626;
+--muted:var(--color-text-secondary);
+--border:var(--color-border-tertiary);
+}
+.wrap{padding:1rem 0;font-size:13px;}
+.tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:0.5px solid var(--border);padding-bottom:0;}
+.tab{padding:7px 14px;border-radius:6px 6px 0 0;cursor:pointer;font-size:12px;font-weight:500;color:var(--muted);border:0.5px solid transparent;border-bottom:none;transition:all 0.15s;margin-bottom:-0.5px;}
+.tab.on{background:var(--color-background-primary);border-color:var(--border);color:var(--color-text-primary);}
+.tab:not(.on):hover{color:var(--color-text-primary);}
+.panel{display:none;}.panel.on{display:block;}
+
+.section-head{font-size:11px;font-weight:500;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase;margin:14px 0 8px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
+
+.card{background:var(--color-background-primary);border:0.5px solid var(--border);border-radius:var(--border-radius-lg);padding:12px 14px;}
+.card-sm{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:9px 12px;}
+
+.label{font-size:11px;color:var(--muted);margin-bottom:3px;}
+.val{font-size:15px;font-weight:500;color:var(--color-text-primary);}
+.val-lg{font-size:22px;font-weight:500;color:var(--color-text-primary);}
+
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
+.pill-blue{background:var(--color-background-info);color:var(--color-text-info);}
+.pill-green{background:var(--color-background-success);color:var(--color-text-success);}
+.pill-amber{background:var(--color-background-warning);color:var(--color-text-warning);}
+.pill-red{background:var(--color-background-danger);color:var(--color-text-danger);}
+.pill-gray{background:var(--color-background-secondary);color:var(--color-text-secondary);}
+
+.stack-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--border);}
+.stack-row:last-child{border-bottom:none;}
+.stack-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:var(--color-background-secondary);}
+.stack-info{flex:1;min-width:0;}
+.stack-name{font-size:12px;font-weight:500;color:var(--color-text-primary);}
+.stack-why{font-size:11px;color:var(--muted);}
+.stack-tag{margin-left:auto;flex-shrink:0;}
+
+.page-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);margin-bottom:5px;cursor:default;transition:background 0.1s;}
+.page-item:hover{background:var(--color-background-primary);border:0.5px solid var(--border);}
+.page-num{font-size:10px;font-family:var(--font-mono);color:var(--muted);min-width:22px;}
+.page-path{font-size:12px;font-weight:500;color:var(--color-text-primary);font-family:var(--font-mono);}
+.page-desc{font-size:11px;color:var(--muted);margin-left:auto;}
+
+.table-row{display:grid;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--border-radius-md);margin-bottom:5px;background:var(--color-background-secondary);}
+.tr-5{grid-template-columns:140px 1fr 80px 60px 28px;}
+.th{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;padding:6px 12px;}
+.th-5{grid-template-columns:140px 1fr 80px 60px 28px;}
+.tbl-name{font-size:12px;font-weight:500;font-family:var(--font-mono);color:var(--color-text-primary);}
+.tbl-cols{font-size:11px;color:var(--muted);}
+.tbl-note{font-size:11px;color:var(--muted);text-align:right;}
+.tbl-count{font-size:11px;font-family:var(--font-mono);color:var(--muted);text-align:center;}
+
+.week-block{margin-bottom:14px;}
+.week-label{font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.week-num{font-size:10px;font-family:var(--font-mono);padding:2px 7px;border-radius:20px;}
+.day-grid{display:flex;flex-direction:column;gap:4px;}
+.day-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);}
+.day-label{font-size:10px;font-family:var(--font-mono);color:var(--muted);min-width:32px;}
+.day-bar{flex:1;height:4px;border-radius:2px;background:var(--border);}
+.day-fill{height:100%;border-radius:2px;transition:width 0.6s ease;}
+.day-task{font-size:11px;color:var(--color-text-secondary);}
+
+.cut-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);margin-bottom:4px;}
+.cut-x{font-size:12px;color:var(--color-text-danger);font-weight:500;min-width:16px;}
+.cut-name{font-size:12px;color:var(--color-text-primary);flex:1;}
+.cut-when{font-size:10px;font-family:var(--font-mono);color:var(--muted);}
+
+.mock-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);margin-bottom:6px;}
+.mock-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.mock-info{flex:1;}
+.mock-title{font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:2px;}
+.mock-desc{font-size:11px;color:var(--muted);line-height:1.5;}
+.mock-badge{font-size:10px;margin-top:4px;}
+
+.summary-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:0.5px solid var(--border);}
+.summary-row:last-child{border-bottom:none;}
+.summary-key{font-size:12px;color:var(--muted);}
+.summary-val{font-size:12px;font-weight:500;color:var(--color-text-primary);text-align:right;}
+
+.progress-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:6px;}
+.progress-fill-blue{height:100%;background:var(--color-text-info);border-radius:3px;}
+.progress-fill-green{height:100%;background:var(--color-text-success);border-radius:3px;}
+
+.arch-box{background:var(--color-background-primary);border:0.5px solid var(--border);border-radius:var(--border-radius-lg);padding:14px;}
+.arch-tier{display:flex;align-items:stretch;gap:6px;margin-bottom:8px;}
+.arch-layer{flex:1;padding:10px 12px;border-radius:var(--border-radius-md);text-align:center;}
+.arch-arrow{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;padding:0 2px;}
+.arch-label{font-size:11px;font-weight:500;margin-bottom:2px;}
+.arch-sub{font-size:10px;color:var(--muted);}
+</style>
+
+<div class="wrap">
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+  <div>
+    <div style="font-size:18px;font-weight:500;color:var(--color-text-primary)">Melhek OS — V1 MVP</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">Solo founder build · Cursor + V0 + Supabase · 6–8 weeks</div>
+  </div>
+  <div style="display:flex;gap:6px;">
+    <span class="pill pill-green"><i class="ti ti-check" aria-hidden="true"></i> 6 modules</span>
+    <span class="pill pill-blue"><i class="ti ti-table" aria-hidden="true"></i> 6 tables</span>
+    <span class="pill pill-amber"><i class="ti ti-files" aria-hidden="true"></i> 12 pages</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab on" onclick="showTab('overview')">Overview</div>
+  <div class="tab" onclick="showTab('stack')">Tech stack</div>
+  <div class="tab" onclick="showTab('schema')">Database</div>
+  <div class="tab" onclick="showTab('pages')">Pages</div>
+  <div class="tab" onclick="showTab('timeline')">Build order</div>
+  <div class="tab" onclick="showTab('cuts')">What's cut</div>
+</div>
+
+<div class="panel on" id="panel-overview">
+  <div class="grid4" style="margin-bottom:16px;">
+    <div class="card-sm"><div class="label">Pages</div><div class="val-lg">12</div><div style="font-size:10px;color:var(--muted)">No empty stubs</div></div>
+    <div class="card-sm"><div class="label">DB tables</div><div class="val-lg">6</div><div style="font-size:10px;color:var(--muted)">Supabase Postgres</div></div>
+    <div class="card-sm"><div class="label">Components</div><div class="val-lg">26</div><div style="font-size:10px;color:var(--muted)">All reusable</div></div>
+    <div class="card-sm"><div class="label">API routes</div><div class="val-lg">4</div><div style="font-size:10px;color:var(--muted)">AI only — rest is Supabase direct</div></div>
+  </div>
+
+  <div class="section-head">Architecture principle</div>
+  <div class="arch-box" style="margin-bottom:14px;">
+    <div class="arch-tier">
+      <div class="arch-layer" style="background:var(--color-background-info);">
+        <div class="arch-label" style="color:var(--color-text-info);">Browser (Next.js React)</div>
+        <div class="arch-sub">12 pages · 26 components · Tailwind</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <div style="flex:2;display:flex;flex-direction:column;gap:6px;">
+        <div class="arch-tier" style="margin-bottom:0;">
+          <div class="arch-layer" style="background:var(--color-background-success);flex:1;">
+            <div class="arch-label" style="color:var(--color-text-success);">Supabase direct</div>
+            <div class="arch-sub">Auth · DB · Storage · RLS</div>
+          </div>
+          <div class="arch-arrow"><i class="ti ti-arrows-exchange-2" aria-hidden="true"></i></div>
+          <div class="arch-layer" style="background:var(--color-background-warning);flex:1;">
+            <div class="arch-label" style="color:var(--color-text-warning);">Next.js API routes</div>
+            <div class="arch-sub">AI only — 4 routes</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="arch-tier" style="margin-top:6px;margin-bottom:0;">
+      <div class="arch-layer" style="background:var(--color-background-secondary);flex:2;">
+        <div class="arch-label">Postgres (via Supabase)</div>
+        <div class="arch-sub">6 tables · RLS enforced · auto-generated types</div>
+      </div>
+      <div class="arch-arrow"><i class="ti ti-arrow-right" aria-hidden="true"></i></div>
+      <div class="arch-layer" style="background:var(--color-background-secondary);flex:1;">
+        <div class="arch-label">Claude API</div>
+        <div class="arch-sub">Streaming · claude-sonnet-4</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border);">
+      No separate backend server. No Express. No Docker. No queues. Frontend talks directly to Supabase (RLS secures data). Only AI calls go through Next.js API routes to hide the API key.
+    </div>
+  </div>
+
+  <div class="section-head">6 modules in V1</div>
+  <div class="grid2">
+    <div class="card-sm" style="display:flex;align-items:center;gap:10px;">
+      <i class="ti ti-layout-dashboard" style="font-size:20px;color:var(--color-text-info)" aria-hidden="true"></i>
+      <div><div style="font-size:12px;font-weight:500;">Dashboard</div><div style="font-size:11px;color:var(--muted);">KPIs · today's tasks · events</div></div>
+    </div>
+    <div class="card-sm" style="display:flex;align-items:center;gap:10px;">
+      <i class="ti ti-checkbox" style="font-size:20px;color:var(--color-text-success)" aria-hidden="true"></i>
+      <div><div style="font-size:12px;font-weight:500;">Tasks</div><div style="font-size:11px;color:var(--muted);">List view · CRUD · filtering</div></div>
+    </div>
+    <div class="card-sm" style="display:flex;align-items:center;gap:10px;">
+      <i class="ti ti-folders" style="font-size:20px;color:var(--color-text-warning)" aria-hidden="true"></i>
+      <div><div style="font-size:12px;font-weight:500;">Projects</div><div style="font-size:11px;color:var(--muted);">Grid · progress · task grouping</div></div>
+    </div>
+    <div class="card-sm" style="display:flex;align-items:center;gap:10px;">
+      <i class="ti ti-calendar" style="font-size:20px;color:var(--color-text-info)" aria-hidden="true"></i>
+      <div><div style="font-size:12px;font-weight:500;">Calendar</div><div style="font-size:11px;color:var(--muted);">Month view · events · task dates</div></div>
+    </div>
+    <div class="card-sm" style="display:flex;align-items:center;gap:10px;">
+      <i class="ti ti-robot" style="font-size:20px;color:var(--color-text-success)" aria-hidden="true"></i>
+      <div><div style="font-size:12px;font-weight:500;">AI assistant (ARIA)</div><div style="font-size:11px;color:var(--muted);">Streaming chat · history · context</div></div>
+    </div>
+    <div class="card-sm" style="display:flex;align-items:center;gap:10px;">
+      <i class="ti ti-notes" style="font-size:20px;color:var(--color-text-warning)" aria-hidden="true"></i>
+      <div><div style="font-size:12px;font-weight:500;">Notes</div><div style="font-size:11px;color:var(--muted);">Markdown editor · search · tags</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panel-stack">
+  <div class="section-head">Core stack — every choice justified</div>
+  <div class="card">
+    <div class="stack-row">
+      <div class="stack-icon"><i class="ti ti-brand-nextjs" aria-hidden="true"></i></div>
+      <div class="stack-info"><div class="stack-name">Next.js 14 (App Router)</div><div class="stack-why">File-based routing · Cursor generates it perfectly · Vercel deploy in 2 min</div></div>
+      <div class="stack-tag"><span class="pill pill-blue">Frontend</span></div>
+    </div>
+    <div class="stack-row">
+      <div class="stack-icon"><i class="ti ti-brand-typescript" aria-hidden="true"></i></div>
+      <div class="stack-info"><div class="stack-name">TypeScript</div><div class="stack-why">AI tools give dramatically better suggestions · catch bugs before runtime</div></div>
+      <div class="stack-tag"><span class="pill pill-blue">Language</span></div>
+    </div>
+    <div class="stack-row">
+      <div class="stack-icon"><i class="ti ti-wind" aria-hidden="true"></i></div>
+      <div class="stack-info"><div class="stack-name">Tailwind CSS</div><div class="stack-why">V0 generates Tailwind natively · no fighting with CSS files</div></div>
+      <div class="stack-tag"><span class="pill pill-blue">Styling</span></div>
+    </div>
+    <div class="stack-row">
+      <div class="stack-icon"><i class="ti ti-database" aria-hidden="true"></i></div>
+      <div class="stack-info"><div class="stack-name">Supabase</div><div class="stack-why">Auth + DB + Storage + RLS + auto REST API. Replaces entire backend for V1.</div></div>
+      <div class="stack-tag"><span class="pill pill-green">Backend</span></div>
+    </div>
+    <div class="stack-row">
+      <div class="stack-icon"><i class="ti ti-robot" aria-hidden="true"></i></div>
+      <div class="stack-info"><div class="stack-name">Anthropic Claude (claude-sonnet-4)</div><div class="stack-why">Best reasoning · streaming via Vercel AI SDK · ~$15/mo for 5 users</div></div>
+      <div class="stack-tag"><span class="pill pill-green">AI</span></div>
+    </div>
+    <div class="stack-row">
+      <div class="stack-icon"><i class="ti ti-brand-vercel" aria-hidden="true"></i></div>
+      <div class="stack-info"><div class="stack-name">Vercel</div><div class="stack-why">Deploy in 2 minutes from GitHub · free tier covers V1 · edge functions built in</div></div>
+      <div class="stack-tag"><span class="pill pill-amber">Deploy</span></div>
+    </div>
+    <div class="stack-row">
+      <div class="stack-icon"><i class="ti ti-letter-k" aria-hidden="true"></i></div>
+      <div class="stack-info"><div class="stack-name">cmdk</div><div class="stack-why">Command palette (⌘K) in 30 lines — the whole library is purpose-built for this</div></div>
+      <div class="stack-tag"><span class="pill pill-gray">UI lib</span></div>
+    </div>
+    <div class="stack-row">
+      <div class="stack-icon"><i class="ti ti-bell" aria-hidden="true"></i></div>
+      <div class="stack-info"><div class="stack-name">Sonner</div><div class="stack-why">Best-looking toast notifications. Zero config.</div></div>
+      <div class="stack-tag"><span class="pill pill-gray">UI lib</span></div>
+    </div>
+    <div class="stack-row">
+      <div class="stack-icon"><i class="ti ti-markdown" aria-hidden="true"></i></div>
+      <div class="stack-info"><div class="stack-name">@uiw/react-md-editor</div><div class="stack-why">Markdown editor + preview for Notes. Split-pane built in.</div></div>
+      <div class="stack-tag"><span class="pill pill-gray">UI lib</span></div>
+    </div>
+  </div>
+
+  <div class="section-head" style="margin-top:14px;">What NOT to add in V1</div>
+  <div class="grid2">
+    <div class="card-sm" style="border-left:2px solid var(--color-border-danger);border-radius:0 var(--border-radius-md) var(--border-radius-md) 0;">
+      <div style="font-size:11px;font-weight:500;color:var(--color-text-danger);margin-bottom:4px;"><i class="ti ti-x" aria-hidden="true"></i> No Redux / Zustand</div>
+      <div style="font-size:11px;color:var(--muted);">useState + custom hooks is enough. Add if needed in V2.</div>
+    </div>
+    <div class="card-sm" style="border-left:2px solid var(--color-border-danger);border-radius:0 var(--border-radius-md) var(--border-radius-md) 0;">
+      <div style="font-size:11px;font-weight:500;color:var(--color-text-danger);margin-bottom:4px;"><i class="ti ti-x" aria-hidden="true"></i> No Express / Fastify backend</div>
+      <div style="font-size:11px;color:var(--muted);">Supabase is your backend. 4 API routes is all you need.</div>
+    </div>
+    <div class="card-sm" style="border-left:2px solid var(--color-border-danger);border-radius:0 var(--border-radius-md) var(--border-radius-md) 0;">
+      <div style="font-size:11px;font-weight:500;color:var(--color-text-danger);margin-bottom:4px;"><i class="ti ti-x" aria-hidden="true"></i> No Docker</div>
+      <div style="font-size:11px;color:var(--muted);">Vercel handles deployment. Supabase handles DB hosting.</div>
+    </div>
+    <div class="card-sm" style="border-left:2px solid var(--color-border-danger);border-radius:0 var(--border-radius-md) var(--border-radius-md) 0;">
+      <div style="font-size:11px;font-weight:500;color:var(--color-text-danger);margin-bottom:4px;"><i class="ti ti-x" aria-hidden="true"></i> No BullMQ / queues</div>
+      <div style="font-size:11px;color:var(--muted);">Automation engine is V2. Nothing to queue in V1.</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panel-schema">
+  <div class="section-head">6 Supabase tables — nothing more</div>
+  <div style="display:grid;grid-template-columns:140px 1fr 80px 60px 28px;gap:8px;padding:6px 12px;" class="th-5">
+    <div class="th" style="padding:0">Table</div>
+    <div class="th" style="padding:0">Key columns</div>
+    <div class="th" style="padding:0">RLS policy</div>
+    <div class="th" style="padding:0;text-align:center">Rows est.</div>
+    <div class="th" style="padding:0"></div>
+  </div>
+
+  <div class="table-row tr-5">
+    <div class="tbl-name"><i class="ti ti-user" style="font-size:12px;margin-right:4px" aria-hidden="true"></i>profiles</div>
+    <div class="tbl-cols">id · full_name · avatar_url · role · timezone</div>
+    <div style="font-size:11px;"><span class="pill pill-green" style="font-size:10px;">Read all</span></div>
+    <div class="tbl-count">2–10</div>
+    <div><i class="ti ti-lock" style="font-size:12px;color:var(--muted)" aria-hidden="true"></i></div>
+  </div>
+  <div class="table-row tr-5">
+    <div class="tbl-name"><i class="ti ti-folders" style="font-size:12px;margin-right:4px" aria-hidden="true"></i>projects</div>
+    <div class="tbl-cols">id · name · status · color · icon · owner_id · target_date</div>
+    <div style="font-size:11px;"><span class="pill pill-blue" style="font-size:10px;">All auth</span></div>
+    <div class="tbl-count">5–20</div>
+    <div><i class="ti ti-lock" style="font-size:12px;color:var(--muted)" aria-hidden="true"></i></div>
+  </div>
+  <div class="table-row tr-5">
+    <div class="tbl-name"><i class="ti ti-checkbox" style="font-size:12px;margin-right:4px" aria-hidden="true"></i>tasks</div>
+    <div class="tbl-cols">id · title · status · priority · project_id · assignee_id · due_date · sort_order</div>
+    <div style="font-size:11px;"><span class="pill pill-blue" style="font-size:10px;">All auth</span></div>
+    <div class="tbl-count">50–500</div>
+    <div><i class="ti ti-lock" style="font-size:12px;color:var(--muted)" aria-hidden="true"></i></div>
+  </div>
+  <div class="table-row tr-5">
+    <div class="tbl-name"><i class="ti ti-calendar" style="font-size:12px;margin-right:4px" aria-hidden="true"></i>calendar_events</div>
+    <div class="tbl-cols">id · title · event_type · start_at · end_at · all_day · project_id · task_id</div>
+    <div style="font-size:11px;"><span class="pill pill-amber" style="font-size:10px;">Own only</span></div>
+    <div class="tbl-count">20–200</div>
+    <div><i class="ti ti-lock" style="font-size:12px;color:var(--muted)" aria-hidden="true"></i></div>
+  </div>
+  <div class="table-row tr-5">
+    <div class="tbl-name"><i class="ti ti-notes" style="font-size:12px;margin-right:4px" aria-hidden="true"></i>notes</div>
+    <div class="tbl-cols">id · title · content (markdown) · is_pinned · tags[] · project_id</div>
+    <div style="font-size:11px;"><span class="pill pill-amber" style="font-size:10px;">Own only</span></div>
+    <div class="tbl-count">10–200</div>
+    <div><i class="ti ti-lock" style="font-size:12px;color:var(--muted)" aria-hidden="true"></i></div>
+  </div>
+  <div class="table-row tr-5">
+    <div class="tbl-name"><i class="ti ti-robot" style="font-size:12px;margin-right:4px" aria-hidden="true"></i>ai_conversations</div>
+    <div class="tbl-cols">id · user_id · title · messages (jsonb) · context_type · context_id</div>
+    <div style="font-size:11px;"><span class="pill pill-amber" style="font-size:10px;">Own only</span></div>
+    <div class="tbl-count">5–100</div>
+    <div><i class="ti ti-lock" style="font-size:12px;color:var(--muted)" aria-hidden="true"></i></div>
+  </div>
+
+  <div class="section-head" style="margin-top:14px;">What's NOT in the schema (intentionally)</div>
+  <div class="grid2">
+    <div class="card-sm">
+      <div style="font-size:11px;color:var(--color-text-danger);font-weight:500;margin-bottom:4px;">Removed from tasks table</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.7;">parent_task_id — no subtasks yet<br>estimated_hours — no time tracking<br>recurrence — no recurring tasks<br>tags — use project instead<br>embedding — no vector search yet</div>
+    </div>
+    <div class="card-sm">
+      <div style="font-size:11px;color:var(--color-text-danger);font-weight:500;margin-bottom:4px;">Tables not created at all</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.7;">contacts / companies — no CRM<br>automations — no workflow engine<br>invoices — no finance module<br>audit_logs — add in V1.5<br>time_logs — no time tracking</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panel-pages">
+  <div class="section-head">Auth pages (public)</div>
+  <div class="page-item"><span class="page-num">P1</span><span class="page-path">/login</span><span class="page-desc">Email + password · Supabase Auth</span></div>
+  <div class="page-item"><span class="page-num">P2</span><span class="page-path">/onboarding</span><span class="page-desc">First login · name + timezone</span></div>
+
+  <div class="section-head" style="margin-top:12px;">App pages (protected)</div>
+  <div class="page-item"><span class="page-num">P3</span><span class="page-path">/</span><span class="page-desc">Dashboard · KPIs + today view</span></div>
+  <div class="page-item"><span class="page-num">P4</span><span class="page-path">/tasks</span><span class="page-desc">Task list · my / all · filters · quick add</span></div>
+  <div class="page-item"><span class="page-num">P5</span><span class="page-path">/tasks/[id]</span><span class="page-desc">Task detail slide-over panel</span></div>
+  <div class="page-item"><span class="page-num">P6</span><span class="page-path">/projects</span><span class="page-desc">Project grid · create modal</span></div>
+  <div class="page-item"><span class="page-num">P7</span><span class="page-path">/projects/[id]</span><span class="page-desc">Project detail · tasks + notes tabs</span></div>
+  <div class="page-item"><span class="page-num">P8</span><span class="page-path">/calendar</span><span class="page-desc">Month view · events · task due dates</span></div>
+  <div class="page-item"><span class="page-num">P9</span><span class="page-path">/notes</span><span class="page-desc">Split view · list + markdown editor</span></div>
+  <div class="page-item"><span class="page-num">P10</span><span class="page-path">/notes/[id]</span><span class="page-desc">Full page note editor</span></div>
+  <div class="page-item"><span class="page-num">P11</span><span class="page-path">/ai</span><span class="page-desc">ARIA chat · history sidebar · streaming</span></div>
+  <div class="page-item"><span class="page-num">P12</span><span class="page-path">/settings</span><span class="page-desc">Profile · avatar · password</span></div>
+
+  <div class="section-head" style="margin-top:12px;">API routes (4 only — AI + search + upload)</div>
+  <div class="page-item"><span class="page-num">A1</span><span class="page-path">/api/ai/chat</span><span class="page-desc">POST · streaming · Claude API</span></div>
+  <div class="page-item"><span class="page-num">A2</span><span class="page-path">/api/ai/summarize</span><span class="page-desc">POST · 2–3 sentence summary</span></div>
+  <div class="page-item"><span class="page-num">A3</span><span class="page-path">/api/search</span><span class="page-desc">GET · tasks + projects + notes</span></div>
+  <div class="page-item"><span class="page-num">A4</span><span class="page-path">/api/upload</span><span class="page-desc">POST · signed URL for Supabase storage</span></div>
+</div>
+
+<div class="panel" id="panel-timeline">
+  <div class="week-block">
+    <div class="week-label"><span class="pill pill-blue week-num">Week 1</span> Foundation — days 1–5</div>
+    <div class="day-grid">
+      <div class="day-row"><span class="day-label">Day 1</span><div class="day-bar"><div class="day-fill progress-fill-blue" style="width:100%"></div></div><span class="day-task">Project setup · Supabase · DB schema · GitHub → Vercel</span></div>
+      <div class="day-row"><span class="day-label">Day 2</span><div class="day-bar"><div class="day-fill progress-fill-blue" style="width:100%"></div></div><span class="day-task">Design system · all UI components via V0 · Sidebar · login flow</span></div>
+      <div class="day-row"><span class="day-label">Day 3</span><div class="day-bar"><div class="day-fill progress-fill-blue" style="width:100%"></div></div><span class="day-task">Dashboard page · all 12 pages stubbed · ⌘K command palette</span></div>
+      <div class="day-row"><span class="day-label">Day 4</span><div class="day-bar"><div class="day-fill progress-fill-blue" style="width:100%"></div></div><span class="day-task">Tasks list + useTasks hook · quick-add · filtering</span></div>
+      <div class="day-row"><span class="day-label">Day 5</span><div class="day-bar"><div class="day-fill progress-fill-blue" style="width:100%"></div></div><span class="day-task">Task detail slide-over · full CRUD working end-to-end</span></div>
+    </div>
+  </div>
+
+  <div class="week-block">
+    <div class="week-label"><span class="pill pill-green week-num">Week 2</span> Core modules — days 6–10</div>
+    <div class="day-grid">
+      <div class="day-row"><span class="day-label">Day 6</span><div class="day-bar"><div class="day-fill progress-fill-green" style="width:100%"></div></div><span class="day-task">Projects list · ProjectCard · create modal · progress bar</span></div>
+      <div class="day-row"><span class="day-label">Day 7</span><div class="day-bar"><div class="day-fill progress-fill-green" style="width:100%"></div></div><span class="day-task">Project detail · tasks tab · notes tab · linked data</span></div>
+      <div class="day-row"><span class="day-label">Day 8</span><div class="day-bar"><div class="day-fill progress-fill-green" style="width:100%"></div></div><span class="day-task">Calendar · month grid · event CRUD · task due dates shown</span></div>
+      <div class="day-row"><span class="day-label">Day 9</span><div class="day-bar"><div class="day-fill progress-fill-green" style="width:100%"></div></div><span class="day-task">Notes · split view · markdown editor · auto-save · search</span></div>
+      <div class="day-row"><span class="day-label">Day 10</span><div class="day-bar"><div class="day-fill progress-fill-green" style="width:100%"></div></div><span class="day-task">AI chat · /api/ai/chat route · streaming · conversation history</span></div>
+    </div>
+  </div>
+
+  <div class="week-block">
+    <div class="week-label"><span class="pill pill-amber week-num">Week 3</span> Polish + ship — days 11–15</div>
+    <div class="day-grid">
+      <div class="day-row"><span class="day-label">Day 11</span><div class="day-bar"><div class="day-fill" style="width:100%;background:var(--color-text-warning)"></div></div><span class="day-task">Search API route · wire command palette · cross-module results</span></div>
+      <div class="day-row"><span class="day-label">Day 12</span><div class="day-bar"><div class="day-fill" style="width:100%;background:var(--color-text-warning)"></div></div><span class="day-task">Loading skeletons · error boundaries · empty states · toasts</span></div>
+      <div class="day-row"><span class="day-label">Day 13</span><div class="day-bar"><div class="day-fill" style="width:100%;background:var(--color-text-warning)"></div></div><span class="day-task">Settings page · avatar upload · sidebar polish · onboarding</span></div>
+      <div class="day-row"><span class="day-label">Day 14</span><div class="day-bar"><div class="day-fill" style="width:100%;background:var(--color-text-warning)"></div></div><span class="day-task">AI summarize route · note summarizer · dashboard brief template</span></div>
+      <div class="day-row"><span class="day-label">Day 15</span><div class="day-bar"><div class="day-fill" style="width:100%;background:var(--color-text-warning)"></div></div><span class="day-task">QA · mobile test · production Supabase · env vars · SHIP</span></div>
+    </div>
+  </div>
+
+  <div class="card-sm" style="margin-top:4px;">
+    <div style="font-size:11px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--color-text-primary);">Buffer weeks 4–6</strong> — Real-world always takes longer. Use extra time for: fixing bugs users find on day 1, adding Kanban view (V1.5 first feature), polishing mobile layout, and adding the first real V1.5 feature (recurring tasks or Google Calendar sync).
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panel-cuts">
+  <div class="section-head">Mocked in V1 (looks real, isn't)</div>
+  <div class="mock-item">
+    <i class="ti ti-wand" style="font-size:18px;color:var(--color-text-warning)" aria-hidden="true"></i>
+    <div class="mock-info">
+      <div class="mock-title">AI daily brief on dashboard</div>
+      <div class="mock-desc">Template string: "Good morning {name}. You have {n} tasks due today..." — no AI call. Fill with real data from Supabase queries.</div>
+      <span class="pill pill-green mock-badge">30 min to build</span>
+    </div>
+  </div>
+  <div class="mock-item">
+    <i class="ti ti-star" style="font-size:18px;color:var(--color-text-warning)" aria-hidden="true"></i>
+    <div class="mock-info">
+      <div class="mock-title">AI priority suggestion</div>
+      <div class="mock-desc">Sort tasks: overdue first, then by due_date, then priority field. Add a subtle "✦ Prioritized" label. No AI involved.</div>
+      <span class="pill pill-green mock-badge">Already free with sorting logic</span>
+    </div>
+  </div>
+  <div class="mock-item">
+    <i class="ti ti-bell" style="font-size:18px;color:var(--color-text-warning)" aria-hidden="true"></i>
+    <div class="mock-info">
+      <div class="mock-title">Notification bell counter</div>
+      <div class="mock-desc">Count = overdue tasks + tasks due today. No real notification system. In-app only. Badge is a number, not real notifications.</div>
+      <span class="pill pill-green mock-badge">1 Supabase query</span>
+    </div>
+  </div>
+  <div class="mock-item">
+    <i class="ti ti-brain" style="font-size:18px;color:var(--color-text-warning)" aria-hidden="true"></i>
+    <div class="mock-info">
+      <div class="mock-title">ARIA "context awareness"</div>
+      <div class="mock-desc">Manually pass current page data as system context string. On /projects/[id], inject project name + task count. Looks like ARIA "knows" where you are.</div>
+      <span class="pill pill-green mock-badge">5 lines of code per page</span>
+    </div>
+  </div>
+
+  <div class="section-head" style="margin-top:12px;">Cut completely — add in V1.5</div>
+  <div class="grid2">
+    <div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">Kanban board view</span><span class="cut-when">V1.5</span></div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">Recurring tasks</span><span class="cut-when">V1.5</span></div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">Subtasks</span><span class="cut-when">V1.5</span></div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">Google Calendar sync</span><span class="cut-when">V1.5</span></div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">Email notifications</span><span class="cut-when">V1.5</span></div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">Activity log</span><span class="cut-when">V1.5</span></div>
+    </div>
+    <div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">CRM module</span><span class="cut-when">V2</span></div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">Automation engine</span><span class="cut-when">V2</span></div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">Finance / invoicing</span><span class="cut-when">V2</span></div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">Hotel / Agency ops</span><span class="cut-when">V2</span></div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">Native mobile app</span><span class="cut-when">V2</span></div>
+      <div class="cut-item"><span class="cut-x"><i class="ti ti-x" aria-hidden="true"></i></span><span class="cut-name">AI vector search</span><span class="cut-when">V2</span></div>
+    </div>
+  </div>
+
+  <div class="section-head" style="margin-top:12px;">V1 cost estimate (monthly)</div>
+  <div class="card">
+    <div class="summary-row"><span class="summary-key">Vercel (frontend hosting)</span><span class="summary-val">$0 — free tier</span></div>
+    <div class="summary-row"><span class="summary-key">Supabase (DB + auth + storage)</span><span class="summary-val">$0 — free tier (500MB DB)</span></div>
+    <div class="summary-row"><span class="summary-key">Claude API (5 users, light use)</span><span class="summary-val">~$5–15/mo</span></div>
+    <div class="summary-row"><span class="summary-key">Domain name</span><span class="summary-val">~$12/year</span></div>
+    <div class="summary-row" style="border-top:0.5px solid var(--border);margin-top:2px;padding-top:10px;"><span class="summary-key" style="font-weight:500;color:var(--color-text-primary);">Total monthly</span><span class="summary-val" style="color:var(--color-text-success);font-size:15px;">$5–15/mo</span></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function showTab(id){
+  document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.remove('on')});
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  event.target.classList.add('on');
+  document.getElementById('panel-'+id).classList.add('on');
+}
+</script>

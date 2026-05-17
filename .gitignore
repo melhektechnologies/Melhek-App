@@ -1,0 +1,30 @@
+# Next.js ignores
+melhek-os-interface/node_modules/
+melhek-os-interface/.next/
+melhek-os-interface/out/
+melhek-os-interface/build/
+
+# Production env ignores (CRITICAL: Never commit credentials)
+melhek-os-interface/.env.local
+melhek-os-interface/.env.development.local
+melhek-os-interface/.env.test.local
+melhek-os-interface/.env.production.local
+.env.local
+
+# IDEs and OS
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Sandbox internal files
+melhek-os-interface/__v0_runtime_loader.js
+melhek-os-interface/__v0_devtools.tsx
+melhek-os-interface/__v0_jsx-dev-runtime.ts
+melhek-os-interface/.snowflake/
+melhek-os-interface/.v0-trash/
+melhek-os-interface/.vercel/
