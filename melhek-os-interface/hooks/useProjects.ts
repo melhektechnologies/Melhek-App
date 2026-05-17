@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { calcProgress } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -10,9 +10,17 @@ export function useProjects() {
   const [projects, setProjects] = useState<ProjectWithProgress[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const supabase = createClient()
+
+  // Stable client — never recreated across renders
+  const supabase = useRef(createClient()).current
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const fetchProjects = useCallback(async () => {
+    if (!mounted.current) return
     setLoading(true)
     setError(null)
 
@@ -25,6 +33,8 @@ export function useProjects() {
       `)
       .neq('status', 'archived')
       .order('created_at', { ascending: false })
+
+    if (!mounted.current) return
 
     if (fetchError) {
       setError(fetchError.message)
@@ -39,11 +49,25 @@ export function useProjects() {
       setProjects(enriched)
     }
     setLoading(false)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [supabase])
 
   useEffect(() => {
     fetchProjects()
   }, [fetchProjects])
+
+  // Real-time: re-fetch when tasks or projects change remotely
+  useEffect(() => {
+    const channel = supabase
+      .channel('projects-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+        if (mounted.current) fetchProjects()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        if (mounted.current) fetchProjects()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [supabase, fetchProjects])
 
   // ─── Create ───────────────────────────────────────────────
   const createProject = useCallback(async (data: {

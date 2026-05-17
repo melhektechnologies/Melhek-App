@@ -1,35 +1,58 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { Task, TaskStatus, TaskPriority } from '@/types'
 
-interface UseTasksOptions {
+// ─── Types ───────────────────────────────────────────────────
+export interface UseTasksOptions {
   projectId?: string
   myTasksOnly?: boolean
   userId?: string
 }
 
+export interface CreateTaskInput {
+  title: string
+  description?: string | null
+  priority?: TaskPriority
+  project_id?: string | null
+  assignee_id?: string | null
+  due_date?: string | null
+  created_by: string
+}
+
+// Full task select fragment — used consistently everywhere
+const TASK_SELECT = `
+  *,
+  assignee:profiles!tasks_assignee_id_fkey(id, full_name, avatar_url),
+  project:projects!tasks_project_id_fkey(id, name, color, icon)
+`
+
 export function useTasks(options: UseTasksOptions = {}) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const supabase = createClient()
+  
+  // Stable client reference — never recreated
+  const supabase = useRef(createClient()).current
+  
+  // Track mounted state to prevent state updates after unmount
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
+  // ─── Fetch ────────────────────────────────────────────────
   const fetchTasks = useCallback(async () => {
+    if (!mounted.current) return
     setLoading(true)
     setError(null)
 
     let query = supabase
       .from('tasks')
-      .select(`
-        *,
-        assignee:profiles!tasks_assignee_id_fkey(id, full_name, avatar_url),
-        project:projects!tasks_project_id_fkey(id, name, color)
-      `)
-      .neq('status', 'cancelled')
-      .order('sort_order', { ascending: true })
+      .select(TASK_SELECT)
       .order('created_at', { ascending: false })
 
     if (options.projectId) {
@@ -37,77 +60,97 @@ export function useTasks(options: UseTasksOptions = {}) {
     }
 
     if (options.myTasksOnly && options.userId) {
-      query = query.eq('assignee_id', options.userId)
+      query = query.or(`assignee_id.eq.${options.userId},created_by.eq.${options.userId}`)
     }
 
     const { data, error: fetchError } = await query
+
+    if (!mounted.current) return
 
     if (fetchError) {
       setError(fetchError.message)
       toast.error('Failed to load tasks')
     } else {
-      setTasks(data as Task[])
+      setTasks((data as Task[]) ?? [])
     }
     setLoading(false)
-  }, [options.projectId, options.myTasksOnly, options.userId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [options.projectId, options.myTasksOnly, options.userId, supabase])
 
   useEffect(() => {
     fetchTasks()
   }, [fetchTasks])
 
+  // ─── Real-time subscription ───────────────────────────────
+  useEffect(() => {
+    const channel = supabase
+      .channel('tasks-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks' },
+        () => {
+          // Refetch on any remote change to stay in sync
+          if (mounted.current) fetchTasks()
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [supabase, fetchTasks])
+
   // ─── Create ───────────────────────────────────────────────
-  const createTask = useCallback(async (data: {
-    title: string
-    description?: string
-    priority?: TaskPriority
-    project_id?: string | null
-    assignee_id?: string | null
-    due_date?: string | null
-    created_by: string
-  }) => {
+  const createTask = useCallback(async (input: CreateTaskInput): Promise<Task | null> => {
+    // Optimistic insert with temp ID
     const tempId = `temp-${Date.now()}`
-    const optimisticTask: Task = {
+    const optimistic: Task = {
       id: tempId,
-      title: data.title,
-      description: data.description ?? null,
+      title: input.title,
+      description: input.description ?? null,
       status: 'todo',
-      priority: data.priority ?? 'medium',
-      project_id: data.project_id ?? null,
-      assignee_id: data.assignee_id ?? null,
-      created_by: data.created_by,
-      due_date: data.due_date ?? null,
+      priority: input.priority ?? 'medium',
+      project_id: input.project_id ?? null,
+      assignee_id: input.assignee_id ?? null,
+      created_by: input.created_by,
+      due_date: input.due_date ?? null,
       sort_order: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
 
-    setTasks(prev => [optimisticTask, ...prev])
+    setTasks(prev => [optimistic, ...prev])
 
     const { data: newTask, error } = await supabase
       .from('tasks')
-      .insert({ ...data, status: 'todo', priority: data.priority ?? 'medium' })
-      .select(`
-        *,
-        assignee:profiles!tasks_assignee_id_fkey(id, full_name, avatar_url),
-        project:projects!tasks_project_id_fkey(id, name, color)
-      `)
+      .insert({
+        title: input.title,
+        description: input.description ?? null,
+        status: 'todo',
+        priority: input.priority ?? 'medium',
+        project_id: input.project_id ?? null,
+        assignee_id: input.assignee_id ?? null,
+        due_date: input.due_date ?? null,
+        created_by: input.created_by,
+      })
+      .select(TASK_SELECT)
       .single()
+
+    if (!mounted.current) return null
 
     if (error) {
       setTasks(prev => prev.filter(t => t.id !== tempId))
       toast.error('Failed to create task')
-    } else {
-      setTasks(prev => prev.map(t => t.id === tempId ? newTask as Task : t))
-      toast.success('Task created')
+      return null
     }
 
-    return newTask
+    setTasks(prev => prev.map(t => t.id === tempId ? (newTask as Task) : t))
+    toast.success('Task created')
+    return newTask as Task
   }, [supabase])
 
   // ─── Update ───────────────────────────────────────────────
-  const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
+  const updateTask = useCallback(async (id: string, updates: Partial<Task>): Promise<void> => {
     const original = tasks.find(t => t.id === id)
-    // Optimistic update
+
+    // Immediate optimistic update
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
 
     const { error } = await supabase
@@ -115,19 +158,23 @@ export function useTasks(options: UseTasksOptions = {}) {
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
 
+    if (!mounted.current) return
+
     if (error) {
-      // Revert
+      // Revert on failure
       if (original) setTasks(prev => prev.map(t => t.id === id ? original : t))
       toast.error('Failed to update task')
     }
   }, [tasks, supabase])
 
   // ─── Delete ───────────────────────────────────────────────
-  const deleteTask = useCallback(async (id: string) => {
+  const deleteTask = useCallback(async (id: string): Promise<void> => {
     const original = tasks.find(t => t.id === id)
     setTasks(prev => prev.filter(t => t.id !== id))
 
     const { error } = await supabase.from('tasks').delete().eq('id', id)
+
+    if (!mounted.current) return
 
     if (error) {
       if (original) setTasks(prev => [original, ...prev])
@@ -137,10 +184,13 @@ export function useTasks(options: UseTasksOptions = {}) {
     }
   }, [tasks, supabase])
 
-  // ─── Status shortcut ─────────────────────────────────────
-  const updateStatus = useCallback((id: string, status: TaskStatus) => {
-    return updateTask(id, { status })
-  }, [updateTask])
+  // ─── Status shortcut ──────────────────────────────────────
+  const toggleComplete = useCallback((id: string) => {
+    const task = tasks.find(t => t.id === id)
+    if (!task) return
+    const next: TaskStatus = task.status === 'done' ? 'todo' : 'done'
+    return updateTask(id, { status: next })
+  }, [tasks, updateTask])
 
   return {
     tasks,
@@ -150,6 +200,6 @@ export function useTasks(options: UseTasksOptions = {}) {
     createTask,
     updateTask,
     deleteTask,
-    updateStatus,
+    toggleComplete,
   }
 }
