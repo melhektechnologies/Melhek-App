@@ -1,66 +1,61 @@
-import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
-import { ARIA_SYSTEM_PROMPT, buildContextPrompt } from '@/lib/ai/aria'
+import { createGroq } from '@ai-sdk/groq'
+import { streamText } from 'ai'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import { NextRequest } from 'next/server'
+import { ARIA_SYSTEM_PROMPT, buildContextPrompt, type ARIAContext } from '@/lib/ai/aria'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
+const groq = createGroq({ apiKey: process.env.GROQ_API_KEY! })
+
+// ─── Auth guard helper ────────────────────────────────────────
+async function getAuthUser() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: () => {},
+      },
+    }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}
 
 export async function POST(req: NextRequest) {
   try {
+    // ── Security: require authenticated user ─────────────────
+    const user = await getAuthUser()
+    if (!user) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json()
     const { messages, context } = body as {
       messages: { role: 'user' | 'assistant'; content: string }[]
-      context?: { type: 'project' | 'task' | 'general'; data: string }
+      context?: ARIAContext
     }
 
-    if (!messages || messages.length === 0) {
-      return NextResponse.json({ error: 'No messages provided' }, { status: 400 })
+    if (!messages?.length) {
+      return Response.json({ error: 'No messages provided' }, { status: 400 })
     }
 
     const systemPrompt = ARIA_SYSTEM_PROMPT + buildContextPrompt(context)
 
-    // Build a streaming response
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          const anthropicStream = await anthropic.messages.stream({
-            model: 'claude-sonnet-4-5',
-            max_tokens: 2048,
-            system: systemPrompt,
-            messages: messages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-          })
-
-          for await (const chunk of anthropicStream) {
-            if (
-              chunk.type === 'content_block_delta' &&
-              chunk.delta.type === 'text_delta'
-            ) {
-              controller.enqueue(encoder.encode(chunk.delta.text))
-            }
-          }
-
-          controller.close()
-        } catch (err) {
-          controller.error(err)
-        }
-      },
+    // ── Stream via Groq Llama 3.3 70B (free tier) ────────────
+    const result = streamText({
+      model: groq('llama-3.3-70b-versatile'),
+      system: systemPrompt,
+      messages,
+      maxOutputTokens: 1024,
+      temperature: 0.7,
     })
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Transfer-Encoding': 'chunked',
-        'Cache-Control': 'no-cache',
-        'X-Accel-Buffering': 'no',
-      },
-    })
+    return result.toTextStreamResponse()
   } catch (err) {
-    console.error('[AI Chat]', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('[ARIA Chat]', err)
+    return Response.json({ error: 'AI service unavailable. Please try again.' }, { status: 500 })
   }
 }

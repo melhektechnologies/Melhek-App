@@ -3,29 +3,66 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
+import { useTasks } from '@/hooks/useTasks'
+import { useProjects } from '@/hooks/useProjects'
+import { useNotes } from '@/hooks/useNotes'
+import { renderMarkdown } from '@/lib/markdown'
 import { formatDateTime } from '@/lib/utils'
-import { Send, Zap, Plus, Trash2, Loader2, Bot, User } from 'lucide-react'
+import {
+  Send, Zap, Plus, Trash2, Loader2, Bot, User,
+  RefreshCw, FolderKanban, CheckSquare, FileText, X, ChevronDown
+} from 'lucide-react'
 import type { AIConversation, ChatMessage } from '@/types'
+
+// ─── Suggested prompts ────────────────────────────────────────
+const SUGGESTIONS = [
+  'Summarize my active projects',
+  'What tasks are overdue?',
+  'Draft a project proposal',
+  'Help me prioritize my work',
+  'Analyze risks in my projects',
+]
+
+// ─── Context type config ──────────────────────────────────────
+const CTX_CFG = {
+  project:  { icon: FolderKanban, label: 'Project',  color: '#0080FF' },
+  task:     { icon: CheckSquare,  label: 'Task',     color: '#00d084' },
+  note:     { icon: FileText,     label: 'Note',     color: '#a855f7' },
+  general:  { icon: Zap,          label: 'General',  color: '#00D4FF' },
+}
 
 export default function AIPage() {
   const { profile } = useUser()
   const supabase = useRef(createClient()).current
   const mounted = useRef(true)
-  useEffect(() => {
-    mounted.current = true
-    return () => { mounted.current = false }
-  }, [])
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
 
+  // Data hooks for context injection
+  const { tasks } = useTasks()
+  const { projects } = useProjects()
+  const { notes } = useNotes()
+
+  // Chat state
   const [conversations, setConversations] = useState<AIConversation[]>([])
   const [activeConvId, setActiveConvId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [loadingConvs, setLoadingConvs] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  // Context injection
+  const [ctxType, setCtxType] = useState<'general' | 'project' | 'task' | 'note'>('general')
+  const [ctxId, setCtxId] = useState('')
+  const [ctxPickerOpen, setCtxPickerOpen] = useState(false)
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const lastMessagesRef = useRef<ChatMessage[]>([])
 
-  // Load conversations
+  // ─── Load conversations ────────────────────────────────────
   const loadConversations = useCallback(async () => {
     if (!profile || !mounted.current) return
     const { data } = await supabase
@@ -33,7 +70,7 @@ export default function AIPage() {
       .select('*')
       .eq('user_id', profile.id)
       .order('updated_at', { ascending: false })
-      .limit(20)
+      .limit(25)
     if (mounted.current) {
       setConversations((data as AIConversation[]) ?? [])
       setLoadingConvs(false)
@@ -42,7 +79,7 @@ export default function AIPage() {
 
   useEffect(() => { loadConversations() }, [loadConversations])
 
-  // Load messages when conversation changes
+  // Sync messages from active conversation
   useEffect(() => {
     if (!activeConvId) { setMessages([]); return }
     const conv = conversations.find(c => c.id === activeConvId)
@@ -52,29 +89,38 @@ export default function AIPage() {
   // Auto-scroll
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, streaming])
 
-  const newConversation = () => {
-    setActiveConvId(null)
-    setMessages([])
-    inputRef.current?.focus()
-  }
+  // ─── Build context data string ─────────────────────────────
+  const buildContextData = useCallback((): { type: typeof ctxType; data: string } | undefined => {
+    if (ctxType === 'general') return undefined
+    if (ctxType === 'project' && ctxId) {
+      const p = projects.find(p => p.id === ctxId)
+      if (p) return { type: 'project', data: `Project: ${p.name}\nStatus: ${p.status}\nDescription: ${p.description ?? 'None'}` }
+    }
+    if (ctxType === 'task' && ctxId) {
+      const t = tasks.find(t => t.id === ctxId)
+      if (t) return { type: 'task', data: `Task: ${t.title}\nStatus: ${t.status}\nPriority: ${t.priority}\nDue: ${t.due_date ?? 'None'}\nDescription: ${t.description ?? 'None'}` }
+    }
+    if (ctxType === 'note' && ctxId) {
+      const n = notes.find(n => n.id === ctxId)
+      if (n) return { type: 'note', data: `Note: ${n.title}\n\n${n.content.slice(0, 800)}` }
+    }
+    return undefined
+  }, [ctxType, ctxId, projects, tasks, notes])
 
-  const deleteConversation = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    await supabase.from('ai_conversations').delete().eq('id', id)
-    setConversations(prev => prev.filter(c => c.id !== id))
-    if (activeConvId === id) { setActiveConvId(null); setMessages([]) }
-  }
+  // ─── Send message ──────────────────────────────────────────
+  const sendMessage = useCallback(async (overrideInput?: string) => {
+    const text = (overrideInput ?? input).trim()
+    if (!text || streaming || !profile) return
 
-  const sendMessage = async () => {
-    if (!input.trim() || streaming || !profile) return
-
-    const userMsg: ChatMessage = { role: 'user', content: input.trim(), timestamp: new Date().toISOString() }
+    const userMsg: ChatMessage = { role: 'user', content: text, timestamp: new Date().toISOString() }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
     setInput('')
     setStreaming(true)
+    setError(null)
+    lastMessagesRef.current = newMessages
 
-    // Placeholder for streaming response
+    // Placeholder assistant message
     const placeholder: ChatMessage = { role: 'assistant', content: '', timestamp: new Date().toISOString() }
     setMessages(prev => [...prev, placeholder])
 
@@ -82,10 +128,17 @@ export default function AIPage() {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages.map(m => ({ role: m.role, content: m.content })) }),
+        body: JSON.stringify({
+          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          context: buildContextData(),
+        }),
       })
 
-      if (!res.ok || !res.body) throw new Error('Stream failed')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Request failed' }))
+        throw new Error(err.error ?? `HTTP ${res.status}`)
+      }
+      if (!res.body) throw new Error('No response stream')
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -94,11 +147,33 @@ export default function AIPage() {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        fullText += decoder.decode(value, { stream: true })
-        setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, content: fullText } : m))
+
+        // Handle Vercel AI SDK text stream format (may have "0:" prefix)
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+        for (const line of lines) {
+          if (line.startsWith('0:')) {
+            // Vercel AI SDK data stream format
+            try {
+              fullText += JSON.parse(line.slice(2))
+            } catch {
+              fullText += line.slice(2)
+            }
+          } else if (line && !line.startsWith('d:') && !line.startsWith('e:')) {
+            fullText += line
+          }
+        }
+
+        if (mounted.current) {
+          setMessages(prev => prev.map((m, i) =>
+            i === prev.length - 1 ? { ...m, content: fullText } : m
+          ))
+        }
       }
 
-      // Save conversation to Supabase
+      if (!mounted.current) return
+
+      // Persist to Supabase
       const assistantMsg: ChatMessage = { role: 'assistant', content: fullText, timestamp: new Date().toISOString() }
       const finalMessages = [...newMessages, assistantMsg]
       const title = newMessages[0].content.slice(0, 60)
@@ -107,9 +182,8 @@ export default function AIPage() {
         const { data: newConv } = await supabase
           .from('ai_conversations')
           .insert({ user_id: profile.id, title, messages: finalMessages })
-          .select('*')
-          .single()
-        if (newConv) {
+          .select('*').single()
+        if (newConv && mounted.current) {
           setActiveConvId(newConv.id)
           setConversations(prev => [newConv as AIConversation, ...prev])
         }
@@ -118,26 +192,62 @@ export default function AIPage() {
           .from('ai_conversations')
           .update({ messages: finalMessages, updated_at: new Date().toISOString() })
           .eq('id', activeConvId)
-        setConversations(prev => prev.map(c => c.id === activeConvId ? { ...c, messages: finalMessages } : c))
+        if (mounted.current) {
+          setConversations(prev => prev.map(c =>
+            c.id === activeConvId ? { ...c, messages: finalMessages, updated_at: new Date().toISOString() } : c
+          ))
+        }
       }
-    } catch {
-      setMessages(prev => prev.map((m, i) =>
-        i === prev.length - 1 ? { ...m, content: '⚠️ Failed to get response. Check your API key.' } : m
-      ))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      if (mounted.current) {
+        setError(msg)
+        setMessages(prev => prev.slice(0, -1)) // Remove placeholder
+      }
     } finally {
-      setStreaming(false)
+      if (mounted.current) setStreaming(false)
     }
-  }
+  }, [input, streaming, profile, messages, activeConvId, supabase, buildContextData])
+
+  // ─── Retry last message ────────────────────────────────────
+  const retry = useCallback(() => {
+    if (!lastMessagesRef.current.length) return
+    const lastUser = [...lastMessagesRef.current].reverse().find(m => m.role === 'user')
+    if (lastUser) {
+      setMessages(lastMessagesRef.current.filter(m => m !== lastUser))
+      sendMessage(lastUser.content)
+    }
+  }, [sendMessage])
 
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
   }
 
+  const newConversation = () => {
+    setActiveConvId(null)
+    setMessages([])
+    setError(null)
+    setCtxType('general')
+    setCtxId('')
+    inputRef.current?.focus()
+  }
+
+  const deleteConversation = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    await supabase.from('ai_conversations').delete().eq('id', id)
+    setConversations(prev => prev.filter(c => c.id !== id))
+    if (activeConvId === id) newConversation()
+  }
+
+  const CtxIcon = CTX_CFG[ctxType].icon
+
   return (
-    <div className="flex h-full">
-      {/* Conversation sidebar */}
-      <div className="w-64 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="px-4 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="flex h-full overflow-hidden">
+      {/* ─── Conversation Sidebar ─────────────────────────── */}
+      <div
+        className={`flex-shrink-0 flex flex-col transition-all overflow-hidden ${sidebarOpen ? 'w-64' : 'w-0'}`}
+        style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,5,15,0.6)' }}>
+        <div className="px-3 py-3 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <button onClick={newConversation}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-black press-scale"
             style={{ background: 'linear-gradient(135deg,#0080FF,#00D4FF)' }}>
@@ -145,21 +255,25 @@ export default function AIPage() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+        <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
           {loadingConvs ? (
-            [...Array(4)].map((_, i) => <div key={i} className="h-12 rounded-xl shimmer" />)
+            [...Array(5)].map((_, i) => <div key={i} className="h-10 rounded-xl shimmer" />)
           ) : conversations.length === 0 ? (
-            <p className="text-xs text-center py-4" style={{ color: 'var(--melhek-text-tertiary)' }}>No conversations yet</p>
+            <p className="text-xs text-center py-6" style={{ color: 'var(--melhek-text-tertiary)' }}>
+              No conversations yet
+            </p>
           ) : conversations.map(conv => (
             <button key={conv.id} onClick={() => setActiveConvId(conv.id)}
-              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-all group"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left transition-all group"
               style={{ background: activeConvId === conv.id ? 'rgba(0,128,255,0.12)' : 'transparent' }}>
-              <Bot className="w-3.5 h-3.5 flex-shrink-0" style={{ color: activeConvId === conv.id ? '#00D4FF' : 'var(--melhek-text-tertiary)' }} />
-              <span className="text-xs truncate flex-1" style={{ color: activeConvId === conv.id ? 'var(--melhek-text-primary)' : 'var(--melhek-text-secondary)' }}>
+              <Bot className="w-3.5 h-3.5 flex-shrink-0"
+                style={{ color: activeConvId === conv.id ? '#00D4FF' : 'var(--melhek-text-tertiary)' }} />
+              <span className="text-xs truncate flex-1"
+                style={{ color: activeConvId === conv.id ? 'var(--melhek-text-primary)' : 'var(--melhek-text-secondary)' }}>
                 {conv.title ?? 'Untitled'}
               </span>
               <button onClick={e => deleteConversation(conv.id, e)}
-                className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-colors flex-shrink-0"
+                className="opacity-0 group-hover:opacity-100 p-0.5 rounded flex-shrink-0"
                 style={{ color: 'var(--melhek-text-tertiary)' }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#ff6666')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--melhek-text-tertiary)')}>
@@ -168,26 +282,118 @@ export default function AIPage() {
             </button>
           ))}
         </div>
+
+        <div className="px-3 py-3 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg"
+            style={{ background: 'rgba(0,128,255,0.08)', border: '1px solid rgba(0,128,255,0.15)' }}>
+            <Zap className="w-3 h-3 flex-shrink-0" style={{ color: '#00D4FF' }} />
+            <span className="text-[10px]" style={{ color: 'var(--melhek-text-tertiary)' }}>
+              Powered by Groq · Llama 3.3 70B
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* ─── Chat Area ────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Topbar */}
+        <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,5,15,0.4)' }}>
+          <button onClick={() => setSidebarOpen(v => !v)} className="p-1.5 rounded-lg"
+            style={{ color: 'var(--melhek-text-tertiary)' }}>
+            <Bot className="w-4 h-4" />
+          </button>
+          <h1 className="text-sm font-semibold flex-1" style={{ color: 'var(--melhek-text-primary)' }}>
+            ARIA — Melhek AI
+          </h1>
+
+          {/* Context picker */}
+          <div className="relative">
+            <button onClick={() => setCtxPickerOpen(v => !v)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all"
+              style={{
+                background: ctxType !== 'general' ? 'rgba(0,128,255,0.12)' : 'var(--melhek-bg-3)',
+                color: ctxType !== 'general' ? CTX_CFG[ctxType].color : 'var(--melhek-text-secondary)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}>
+              <CtxIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{ctxType !== 'general' ? 'Context: ' + CTX_CFG[ctxType].label : 'Add Context'}</span>
+              <ChevronDown className="w-3 h-3 opacity-60" />
+            </button>
+
+            {ctxPickerOpen && (
+              <div className="absolute right-0 top-full mt-1 z-30 rounded-xl overflow-hidden shadow-2xl"
+                style={{ background: 'var(--melhek-bg-1)', border: '1px solid rgba(255,255,255,0.1)', width: 220, minWidth: 180 }}>
+                {/* Context type selector */}
+                {(['general', 'project', 'task', 'note'] as const).map(t => {
+                  const cfg = CTX_CFG[t]
+                  return (
+                    <button key={t} onClick={() => { setCtxType(t); setCtxId(''); if (t === 'general') setCtxPickerOpen(false) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs transition-all text-left"
+                      style={{
+                        background: ctxType === t ? 'rgba(0,128,255,0.1)' : 'transparent',
+                        color: ctxType === t ? cfg.color : 'var(--melhek-text-secondary)',
+                      }}>
+                      <cfg.icon className="w-3.5 h-3.5" /> {cfg.label}
+                    </button>
+                  )
+                })}
+
+                {/* Context item selector */}
+                {ctxType !== 'general' && (
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    {ctxType === 'project' && projects.slice(0, 8).map(p => (
+                      <button key={p.id} onClick={() => { setCtxId(p.id); setCtxPickerOpen(false) }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-all truncate"
+                        style={{ background: ctxId === p.id ? 'rgba(0,128,255,0.08)' : 'transparent', color: 'var(--melhek-text-primary)' }}>
+                        {p.icon} {p.name}
+                      </button>
+                    ))}
+                    {ctxType === 'task' && tasks.filter(t => t.status !== 'done').slice(0, 8).map(t => (
+                      <button key={t.id} onClick={() => { setCtxId(t.id); setCtxPickerOpen(false) }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-all truncate"
+                        style={{ background: ctxId === t.id ? 'rgba(0,128,255,0.08)' : 'transparent', color: 'var(--melhek-text-primary)' }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />{t.title}
+                      </button>
+                    ))}
+                    {ctxType === 'note' && notes.slice(0, 8).map(n => (
+                      <button key={n.id} onClick={() => { setCtxId(n.id); setCtxPickerOpen(false) }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-all truncate"
+                        style={{ background: ctxId === n.id ? 'rgba(0,128,255,0.08)' : 'transparent', color: 'var(--melhek-text-primary)' }}>
+                        <FileText className="w-3 h-3 flex-shrink-0" />{n.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button onClick={() => setCtxPickerOpen(false)}
+                  className="w-full flex items-center justify-center gap-1 px-3 py-2 text-xs"
+                  style={{ color: 'var(--melhek-text-tertiary)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <X className="w-3 h-3" /> Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0080FF] to-[#00D4FF] flex items-center justify-center shadow-[0_0_40px_rgba(0,128,255,0.3)]">
-                <Zap className="w-7 h-7 text-black" />
+            <div className="flex flex-col items-center justify-center h-full text-center gap-5">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(0,128,255,0.3)]"
+                style={{ background: 'linear-gradient(135deg,#0080FF,#00D4FF)' }}>
+                <Zap className="w-8 h-8 text-black" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--melhek-text-primary)' }}>ARIA — Melhek AI</h2>
-                <p className="text-sm" style={{ color: 'var(--melhek-text-secondary)' }}>Ask anything about your tasks, projects, or strategy.</p>
+                <h2 className="text-lg font-bold" style={{ color: 'var(--melhek-text-primary)' }}>ARIA</h2>
+                <p className="text-sm mt-1" style={{ color: 'var(--melhek-text-secondary)' }}>
+                  Ask anything — tasks, projects, strategy, or drafting.
+                </p>
               </div>
-              <div className="flex flex-wrap gap-2 justify-center mt-2">
-                {['Summarize my active projects', 'What tasks are overdue?', 'Draft a project proposal'].map(s => (
-                  <button key={s} onClick={() => { setInput(s); inputRef.current?.focus() }}
+              <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+                {SUGGESTIONS.map(s => (
+                  <button key={s} onClick={() => sendMessage(s)}
                     className="px-3 py-1.5 rounded-xl text-xs transition-all"
-                    style={{ background: 'rgba(0,128,255,0.1)', border: '1px solid rgba(0,128,255,0.2)', color: '#00D4FF' }}>
+                    style={{ background: 'rgba(0,128,255,0.08)', border: '1px solid rgba(0,128,255,0.2)', color: '#00D4FF' }}>
                     {s}
                   </button>
                 ))}
@@ -197,40 +403,79 @@ export default function AIPage() {
 
           {messages.map((msg, i) => (
             <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              {/* Avatar */}
               <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${
-                msg.role === 'assistant'
-                  ? 'bg-gradient-to-br from-[#0080FF] to-[#00D4FF]'
-                  : 'bg-gradient-to-br from-[#00D4FF] to-[#0080FF]'
+                msg.role === 'assistant' ? 'bg-gradient-to-br from-[#0080FF] to-[#00D4FF]' : 'bg-gradient-to-br from-[#00D4FF] to-[#0080FF]'
               }`}>
-                {msg.role === 'assistant'
-                  ? <Zap className="w-3.5 h-3.5 text-black" />
-                  : <User className="w-3.5 h-3.5 text-black" />}
+                {msg.role === 'assistant' ? <Zap className="w-3.5 h-3.5 text-black" /> : <User className="w-3.5 h-3.5 text-black" />}
               </div>
-              <div className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                msg.role === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'
-              }`}
+
+              {/* Bubble */}
+              <div className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
                 style={{
                   background: msg.role === 'user' ? 'rgba(0,128,255,0.15)' : 'var(--melhek-bg-2)',
                   border: `1px solid ${msg.role === 'user' ? 'rgba(0,128,255,0.2)' : 'rgba(255,255,255,0.06)'}`,
                   color: 'var(--melhek-text-primary)',
-                  whiteSpace: 'pre-wrap',
                 }}>
-                {msg.content}
-                {streaming && i === messages.length - 1 && msg.role === 'assistant' && !msg.content && (
-                  <span className="inline-flex gap-1 items-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </span>
+                {msg.role === 'assistant' ? (
+                  msg.content ? (
+                    <div className="prose-melhek text-sm"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+                  ) : (
+                    // Typing indicator
+                    <span className="inline-flex gap-1 items-center py-0.5">
+                      {[0, 150, 300].map(delay => (
+                        <span key={delay} className="w-1.5 h-1.5 rounded-full animate-bounce"
+                          style={{ background: '#00D4FF', animationDelay: `${delay}ms` }} />
+                      ))}
+                    </span>
+                  )
+                ) : (
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
+                )}
+                {msg.timestamp && (
+                  <p className="text-[10px] mt-1.5 opacity-40">{formatDateTime(msg.timestamp)}</p>
                 )}
               </div>
             </div>
           ))}
+
+          {/* Error with retry */}
+          {error && (
+            <div className="flex justify-center">
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                style={{ background: 'rgba(255,68,68,0.1)', border: '1px solid rgba(255,68,68,0.2)' }}>
+                <span className="text-sm" style={{ color: '#ff6666' }}>{error}</span>
+                <button onClick={retry} disabled={streaming}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                  style={{ background: 'rgba(255,68,68,0.15)', color: '#ff9999' }}>
+                  <RefreshCw className="w-3.5 h-3.5" /> Retry
+                </button>
+              </div>
+            </div>
+          )}
           <div ref={bottomRef} />
         </div>
 
         {/* Input */}
-        <div className="px-6 py-4 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          {/* Active context badge */}
+          {ctxType !== 'general' && ctxId && (
+            <div className="flex items-center gap-2 mb-2">
+              <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs"
+                style={{ background: 'rgba(0,128,255,0.08)', color: CTX_CFG[ctxType].color, border: '1px solid rgba(0,128,255,0.15)' }}>
+                <CtxIcon className="w-3 h-3" />
+                Context: {ctxType === 'project' ? projects.find(p => p.id === ctxId)?.name :
+                  ctxType === 'task' ? tasks.find(t => t.id === ctxId)?.title :
+                  notes.find(n => n.id === ctxId)?.title}
+              </span>
+              <button onClick={() => { setCtxType('general'); setCtxId('') }}
+                className="p-0.5 rounded" style={{ color: 'var(--melhek-text-tertiary)' }}>
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-3 items-end">
             <textarea
               ref={inputRef}
@@ -244,21 +489,19 @@ export default function AIPage() {
                 background: 'var(--melhek-bg-2)',
                 border: '1px solid rgba(255,255,255,0.08)',
                 color: 'var(--melhek-text-primary)',
-                maxHeight: '120px',
+                maxHeight: 120,
               }}
-              onFocus={e => (e.currentTarget.style.borderColor = 'rgba(0,128,255,0.5)')}
+              onFocus={e => (e.currentTarget.style.borderColor = 'rgba(0,128,255,0.4)')}
               onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
             />
-            <button onClick={sendMessage} disabled={!input.trim() || streaming}
+            <button onClick={() => sendMessage()} disabled={!input.trim() || streaming}
               className="w-11 h-11 rounded-2xl flex items-center justify-center text-black transition-all press-scale disabled:opacity-50 flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#0080FF,#00D4FF)' }}
-              onMouseEnter={e => { if (!streaming) e.currentTarget.style.boxShadow = '0 0 20px rgba(0,128,255,0.5)' }}
-              onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}>
+              style={{ background: 'linear-gradient(135deg,#0080FF,#00D4FF)' }}>
               {streaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </div>
-          <p className="text-xs mt-2 text-center" style={{ color: 'var(--melhek-text-tertiary)' }}>
-            ARIA uses Claude. Conversations are saved to your account.
+          <p className="text-[10px] mt-2 text-center" style={{ color: 'var(--melhek-text-tertiary)' }}>
+            ARIA uses Groq · Llama 3.3 70B · Free tier · Conversations saved to your account
           </p>
         </div>
       </div>
