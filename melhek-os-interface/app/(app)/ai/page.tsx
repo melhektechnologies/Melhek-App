@@ -72,15 +72,28 @@ export default function AIPage() {
   // ─── Load conversations ────────────────────────────────────
   const loadConversations = useCallback(async () => {
     if (!profile || !mounted.current) return
-    const { data } = await supabase
-      .from('ai_conversations')
-      .select('*')
-      .eq('user_id', profile.id)
-      .order('updated_at', { ascending: false })
-      .limit(25)
-    if (mounted.current) {
-      setConversations((data as AIConversation[]) ?? [])
-      setLoadingConvs(false)
+    try {
+      const { data, error } = await supabase
+        .from('ai_conversations')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('updated_at', { ascending: false })
+        .limit(25)
+      
+      if (error) {
+        console.warn('[ARIA loadConversations] Supabase query returned error:', error.message)
+        // If table doesn't exist, we fall back gracefully
+      }
+
+      if (mounted.current) {
+        setConversations((data as AIConversation[]) ?? [])
+      }
+    } catch (err) {
+      console.error('[ARIA loadConversations] Failed to fetch:', err)
+    } finally {
+      if (mounted.current) {
+        setLoadingConvs(false)
+      }
     }
   }, [profile, supabase])
 
@@ -131,20 +144,15 @@ export default function AIPage() {
     const placeholder: ChatMessage = { role: 'assistant', content: '', timestamp: new Date().toISOString() }
     setMessages(prev => [...prev, placeholder])
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 12000)
-
     try {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           context: buildContextData(),
         }),
       })
-      clearTimeout(timeoutId)
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Request failed' }))
@@ -211,11 +219,7 @@ export default function AIPage() {
         }
       }
     } catch (err) {
-      clearTimeout(timeoutId)
-      let msg = err instanceof Error ? err.message : 'Unknown error'
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        msg = 'Connection timed out. Please check your GROQ_API_KEY configuration or internet access.'
-      }
+      const msg = err instanceof Error ? err.message : 'Unknown error'
       if (mounted.current) {
         setError(msg)
         setMessages(prev => prev.slice(0, -1)) // Remove placeholder
