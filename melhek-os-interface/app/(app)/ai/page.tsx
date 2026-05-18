@@ -131,15 +131,20 @@ export default function AIPage() {
     const placeholder: ChatMessage = { role: 'assistant', content: '', timestamp: new Date().toISOString() }
     setMessages(prev => [...prev, placeholder])
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 12000)
+
     try {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           context: buildContextData(),
         }),
       })
+      clearTimeout(timeoutId)
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Request failed' }))
@@ -206,7 +211,11 @@ export default function AIPage() {
         }
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
+      clearTimeout(timeoutId)
+      let msg = err instanceof Error ? err.message : 'Unknown error'
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        msg = 'Connection timed out. Please check your GROQ_API_KEY configuration or internet access.'
+      }
       if (mounted.current) {
         setError(msg)
         setMessages(prev => prev.slice(0, -1)) // Remove placeholder
