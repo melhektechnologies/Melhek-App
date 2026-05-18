@@ -48,8 +48,8 @@ export function AppTopbar({ profile }: { profile: Profile | null }) {
       style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(10,10,20,0.6)', backdropFilter: 'blur(12px)' }}
     >
       {/* Mobile Logo */}
-      <div className="sm:hidden w-8 h-8 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center shadow-[0_0_20px_rgba(0,128,255,0.3)] border border-white/10">
-        <img src="/logo.jpg" alt="Melhek Logo" className="w-full h-full object-cover" />
+      <div className="sm:hidden w-8 h-8 flex-shrink-0 flex items-center justify-center">
+        <img src="/logo.jpg" alt="Melhek Logo" className="w-full h-full object-contain" />
       </div>
 
       {/* Search */}

@@ -411,8 +411,8 @@ export default function AIPage() {
         <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center gap-5">
-              <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center shadow-[0_0_40px_rgba(0,128,255,0.3)] border border-white/10">
-                <img src="/logo.jpg" alt="Melhek Logo" className="w-full h-full object-cover" />
+              <div className="w-16 h-16 flex items-center justify-center">
+                <img src="/logo.jpg" alt="Melhek Logo" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h2 className="text-lg font-bold" style={{ color: 'var(--melhek-text-primary)' }}>ARIA</h2>
@@ -435,15 +435,15 @@ export default function AIPage() {
           {messages.map((msg, i) => (
             <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               {/* Avatar */}
-              <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-1 shadow-[0_0_10px_rgba(0,128,255,0.2)] border border-white/5">
-                {msg.role === 'assistant' ? (
-                  <img src="/logo.jpg" alt="ARIA Logo" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-[#00D4FF] to-[#0080FF] flex items-center justify-center text-[10px] font-bold text-black">
-                    {profile ? getInitials(profile.full_name) : '?'}
-                  </div>
-                )}
-              </div>
+              {msg.role === 'assistant' ? (
+                <div className="w-7 h-7 flex-shrink-0 mt-1 flex items-center justify-center">
+                  <img src="/logo.jpg" alt="ARIA Logo" className="w-full h-full object-contain" />
+                </div>
+              ) : (
+                <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-1 shadow-[0_0_10px_rgba(0,128,255,0.2)] border border-white/5 bg-gradient-to-br from-[#00D4FF] to-[#0080FF] flex items-center justify-center text-[10px] font-bold text-black">
+                  {profile ? getInitials(profile.full_name) : '?'}
+                </div>
+              )}
 
               {/* Bubble */}
               <div className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}

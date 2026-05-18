@@ -71,8 +71,8 @@ export default function DashboardPage() {
         {brief && (
           <div className="flex items-start gap-2.5 mt-3 px-4 py-3 rounded-xl text-sm"
             style={{ background: 'rgba(0,128,255,0.06)', border: '1px solid rgba(0,128,255,0.15)', color: 'var(--melhek-text-secondary)' }}>
-            <div className="w-5 h-5 rounded-md overflow-hidden flex-shrink-0 mt-0.5 shadow-[0_0_10px_rgba(0,128,255,0.2)] border border-white/5">
-              <img src="/logo.jpg" alt="Melhek Logo" className="w-full h-full object-cover" />
+            <div className="w-5 h-5 flex-shrink-0 mt-0.5">
+              <img src="/logo.jpg" alt="Melhek Logo" className="w-full h-full object-contain" />
             </div>
             <span>{brief}</span>
           </div>
