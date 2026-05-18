@@ -280,7 +280,15 @@ export default function CalendarPage() {
   }, [modal, deleteEvent])
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden relative">
+      {/* Backdrop for mobile */}
+      {selectedDate && (
+        <div 
+          className="fixed inset-0 z-20 bg-black/60 lg:hidden backdrop-blur-sm transition-all"
+          onClick={() => setSelectedDate(null)}
+        />
+      )}
+
       {/* ─── Calendar Grid ──────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 p-4 lg:p-6">
         {/* Header */}
@@ -359,8 +367,12 @@ export default function CalendarPage() {
 
       {/* ─── Day Detail Panel ───────────────────────────── */}
       {selectedDate && (
-        <div className="w-72 flex-shrink-0 flex flex-col overflow-hidden"
-          style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,5,15,0.6)' }}>
+        <div className="absolute lg:relative right-0 inset-y-0 z-30 w-72 flex-shrink-0 flex flex-col overflow-hidden h-full lg:h-auto"
+          style={{ 
+            borderLeft: '1px solid rgba(255,255,255,0.08)', 
+            background: 'rgba(5,5,15,0.95)', 
+            backdropFilter: 'blur(20px)' 
+          }}>
           <div className="px-4 py-4 flex items-center justify-between flex-shrink-0"
             style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div>

@@ -35,12 +35,6 @@ export default function AIPage() {
   const { profile } = useUser()
   const supabase = useRef(createClient()).current
   const mounted = useRef(true)
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
-
-  // Data hooks for context injection
-  const { tasks } = useTasks()
-  const { projects } = useProjects()
-  const { notes } = useNotes()
 
   // Chat state
   const [conversations, setConversations] = useState<AIConversation[]>([])
@@ -61,6 +55,19 @@ export default function AIPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const lastMessagesRef = useRef<ChatMessage[]>([])
+
+  useEffect(() => {
+    mounted.current = true
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setSidebarOpen(false)
+    }
+    return () => { mounted.current = false }
+  }, [])
+
+  // Data hooks for context injection
+  const { tasks } = useTasks()
+  const { projects } = useProjects()
+  const { notes } = useNotes()
 
   // ─── Load conversations ────────────────────────────────────
   const loadConversations = useCallback(async () => {
@@ -242,11 +249,23 @@ export default function AIPage() {
   const CtxIcon = CTX_CFG[ctxType].icon
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden relative">
+      {/* Backdrop for mobile */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 z-20 bg-black/60 md:hidden backdrop-blur-sm transition-all"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* ─── Conversation Sidebar ─────────────────────────── */}
       <div
-        className={`flex-shrink-0 flex flex-col transition-all overflow-hidden ${sidebarOpen ? 'w-64' : 'w-0'}`}
-        style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,5,15,0.6)' }}>
+        className={`absolute md:relative inset-y-0 left-0 z-30 flex-shrink-0 flex flex-col transition-all overflow-hidden h-full md:h-auto ${sidebarOpen ? 'w-64' : 'w-0'}`}
+        style={{ 
+          borderRight: sidebarOpen ? '1px solid rgba(255,255,255,0.08)' : 'none', 
+          background: 'rgba(5,5,15,0.95)', 
+          backdropFilter: 'blur(20px)' 
+        }}>
         <div className="px-3 py-3 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <button onClick={newConversation}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-black press-scale"
