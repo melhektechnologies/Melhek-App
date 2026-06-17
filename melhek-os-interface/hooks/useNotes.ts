@@ -7,7 +7,8 @@ import type { Note } from '@/types'
 
 const NOTE_SELECT = `
   *,
-  project:projects!notes_project_id_fkey(id, name, color, icon)
+  project:projects!notes_project_id_fkey(id, name, color, icon),
+  note_links(opportunity_id)
 `
 
 export function useNotes(projectId?: string) {
@@ -112,6 +113,26 @@ export function useNotes(projectId?: string) {
     return updateNote(id, { is_pinned: !note.is_pinned })
   }, [notes, updateNote])
 
+  // ─── Link Opportunity ──────────────────────────────────────
+  const linkOpportunity = useCallback(async (noteId: string, opportunityId: string | null): Promise<void> => {
+    // Delete existing links
+    await supabase.from('note_links').delete().eq('note_id', noteId)
+
+    if (opportunityId) {
+      const { error } = await supabase.from('note_links').insert({
+        note_id: noteId,
+        opportunity_id: opportunityId,
+      })
+      if (error) {
+        toast.error('Failed to link opportunity')
+        return
+      }
+    }
+
+    toast.success('Note link updated')
+    fetchNotes()
+  }, [supabase, fetchNotes])
+
   // ─── Upload attachment to Supabase Storage ─────────────────
   const uploadAttachment = useCallback(async (noteId: string, file: File): Promise<string | null> => {
     const ext = file.name.split('.').pop()
@@ -162,6 +183,7 @@ export function useNotes(projectId?: string) {
     updateNote,
     deleteNote,
     togglePin,
+    linkOpportunity,
     uploadAttachment,
     searchNotes,
   }

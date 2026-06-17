@@ -3,7 +3,7 @@ import { streamText } from 'ai'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest } from 'next/server'
-import { ARIA_SYSTEM_PROMPT, buildContextPrompt, type ARIAContext } from '@/lib/ai/aria'
+import { ARIA_SYSTEM_PROMPT, ARIA_REVENUE_COACH_PROMPT, buildContextPrompt, type ARIAContext } from '@/lib/ai/aria'
 
 // ─── Auth guard helper ────────────────────────────────────────
 async function getAuthUser() {
@@ -39,16 +39,18 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { messages, context } = body as {
+    const { messages, context, revenueMode } = body as {
       messages: { role: 'user' | 'assistant'; content: string }[]
       context?: ARIAContext
+      revenueMode?: boolean
     }
 
     if (!messages?.length) {
       return Response.json({ error: 'No messages provided' }, { status: 400 })
     }
 
-    const systemPrompt = ARIA_SYSTEM_PROMPT + buildContextPrompt(context)
+    const basePrompt = revenueMode ? ARIA_REVENUE_COACH_PROMPT : ARIA_SYSTEM_PROMPT
+    const systemPrompt = basePrompt + buildContextPrompt(context)
 
     // ── Stream via Groq Llama 3.3 70B (free tier) ────────────
     const groq = createGroq({ apiKey })

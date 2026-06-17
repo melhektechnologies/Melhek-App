@@ -91,6 +91,7 @@ export interface Note {
   updated_at: string
   // Joined
   project?: Pick<Project, 'id' | 'name' | 'color' | 'icon'> | null
+  note_links?: { opportunity_id: string }[]
 }
 
 // ─── Dashboard Stats ────────────────────────────────────────
@@ -131,3 +132,89 @@ export interface CalendarDay {
   tasksDue: { id: string; title: string; priority: TaskPriority }[]
 }
 
+// ─── Revenue OS Types ─────────────────────────────────────────
+
+export type OpportunityStage =
+  | 'lead'
+  | 'contacted'
+  | 'proposal_sent'
+  | 'follow_up'
+  | 'negotiation'
+  | 'won'
+  | 'lost'
+
+export interface Opportunity {
+  id: string
+  user_id: string
+  company_name: string
+  contact_name: string | null
+  phone: string | null
+  industry: string | null
+  potential_revenue: number
+  probability: number
+  stage: OpportunityStage
+  last_contact_date: string | null
+  next_action: string | null
+  next_action_date: string | null
+  notes: string | null
+  proposal_link: string | null
+  project_id: string | null
+  created_at: string
+  updated_at: string
+  // Computed
+  expected_revenue?: number
+}
+
+export interface DailyScorecard {
+  id: string
+  user_id: string
+  date: string
+  calls_made: number
+  followups_sent: number
+  meetings_booked: number
+  proposals_sent: number
+  deals_closed: number
+  revenue_generated: number
+  reflection: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProposalTemplate {
+  id: string
+  user_id: string
+  title: string
+  category: string
+  content: string
+  tags: string[]
+  is_default: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface NoteLink {
+  id: string
+  note_id: string
+  opportunity_id: string | null
+  created_at: string
+}
+
+export interface RevenueStats {
+  goal: number
+  closed: number
+  remaining: number
+  daysRemaining: number
+  daysElapsed: number
+  weeklyTarget: number
+  dailyPaceRequired: number
+  currentDailyPace: number
+  projectedTotal: number
+  progressPercent: number
+  status: 'ahead' | 'on_pace' | 'behind'
+}
+
+export interface SprintConfig {
+  goal: number
+  startDate: string
+  days: number
+}

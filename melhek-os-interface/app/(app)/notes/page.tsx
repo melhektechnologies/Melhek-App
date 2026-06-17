@@ -4,12 +4,13 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useUser } from '@/hooks/useUser'
 import { useNotes } from '@/hooks/useNotes'
 import { useProjects } from '@/hooks/useProjects'
+import { useOpportunities } from '@/hooks/useOpportunities'
 import { renderMarkdown } from '@/lib/markdown'
 import { formatDateTime } from '@/lib/utils'
 import {
   Plus, Search, Pin, PinOff, Trash2, Eye, EyeOff,
   Bold, Italic, Code, List, Link as LinkIcon, Image,
-  Upload, X, Tag, FolderKanban, FileText, Loader2,
+  Upload, X, Tag, FolderKanban, FileText, Loader2, TrendingUp
 } from 'lucide-react'
 import type { Note } from '@/types'
 
@@ -45,8 +46,9 @@ function TB({ onClick, title, children }: { onClick: () => void; title: string; 
 // ─── Main Notes Page ─────────────────────────────────────────
 export default function NotesPage() {
   const { profile } = useUser()
-  const { notes, loading, createNote, updateNote, deleteNote, togglePin, uploadAttachment } = useNotes()
+  const { notes, loading, createNote, updateNote, deleteNote, togglePin, linkOpportunity, uploadAttachment } = useNotes()
   const { projects } = useProjects()
+  const { opportunities } = useOpportunities()
 
   // UI state
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -90,6 +92,18 @@ export default function NotesPage() {
       setPreview(false)
     }
   }, [selectedId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Pre-select note from query param ─────────────────────
+  useEffect(() => {
+    if (notes.length > 0 && typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const id = params.get('id')
+      if (id && notes.some(n => n.id === id)) {
+        setSelectedId(id)
+        setMobileView('editor')
+      }
+    }
+  }, [notes])
 
   // ─── Autosave debounce ────────────────────────────────────
   const scheduleAutosave = useCallback((id: string, t: string, c: string) => {
@@ -390,6 +404,19 @@ export default function NotesPage() {
                     style={{ color: selectedNote.project_id ? 'var(--melhek-text-secondary)' : 'var(--melhek-text-tertiary)' }}>
                     <option value="">No project</option>
                     {projects.map(p => <option key={p.id} value={p.id}>{p.icon} {p.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="w-px h-3" style={{ background: 'rgba(255,255,255,0.1)' }} />
+
+                {/* Opportunity link */}
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--melhek-text-tertiary)' }} />
+                  <select value={selectedNote.note_links?.[0]?.opportunity_id ?? ''} onChange={e => linkOpportunity(selectedNote.id, e.target.value || null)}
+                    className="text-xs focus:outline-none bg-transparent max-w-[120px] truncate"
+                    style={{ color: selectedNote.note_links?.[0]?.opportunity_id ? 'var(--melhek-text-secondary)' : 'var(--melhek-text-tertiary)' }}>
+                    <option value="">No opportunity</option>
+                    {opportunities.map(o => <option key={o.id} value={o.id}>📈 {o.company_name}</option>)}
                   </select>
                 </div>
 

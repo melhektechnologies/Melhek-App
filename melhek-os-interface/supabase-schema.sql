@@ -1,7 +1,16 @@
 -- ============================================================
--- MELHEK OS — Supabase Database Schema (V1 MVP)
+-- MELHEK OS — Supabase Database Schema (V1.1 "Perfection")
 -- Run this entire file in your Supabase SQL Editor
 -- ============================================================
+
+-- ─── HELPER: Auto-update 'updated_at' timestamp ─────────────
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 -- ─── TABLE: profiles ────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -41,10 +50,13 @@ CREATE TABLE IF NOT EXISTS public.projects (
   color        text NOT NULL DEFAULT '#00d4ff',
   icon         text DEFAULT '📁',
   owner_id     uuid REFERENCES public.profiles(id) NOT NULL,
-  target_date  date,
   created_at   timestamptz DEFAULT now() NOT NULL,
   updated_at   timestamptz DEFAULT now() NOT NULL
 );
+
+CREATE TRIGGER handle_projects_updated_at
+  BEFORE UPDATE ON public.projects
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_updated_at();
 
 -- ─── TABLE: tasks ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.tasks (
@@ -62,6 +74,10 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   updated_at   timestamptz DEFAULT now() NOT NULL
 );
 
+CREATE TRIGGER handle_tasks_updated_at
+  BEFORE UPDATE ON public.tasks
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_updated_at();
+
 CREATE INDEX IF NOT EXISTS tasks_project_id_idx  ON public.tasks(project_id);
 CREATE INDEX IF NOT EXISTS tasks_assignee_id_idx ON public.tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS tasks_status_idx      ON public.tasks(status);
@@ -78,6 +94,10 @@ CREATE TABLE IF NOT EXISTS public.ai_conversations (
   created_at    timestamptz DEFAULT now() NOT NULL,
   updated_at    timestamptz DEFAULT now() NOT NULL
 );
+
+CREATE TRIGGER handle_ai_convs_updated_at
+  BEFORE UPDATE ON public.ai_conversations
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_updated_at();
 
 CREATE INDEX IF NOT EXISTS ai_convs_user_idx ON public.ai_conversations(user_id);
 
@@ -98,11 +118,13 @@ DROP POLICY IF EXISTS "ai_convs_own"           ON public.ai_conversations;
 CREATE POLICY "profiles_read_all"   ON public.profiles FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "profiles_update_own" ON public.profiles FOR UPDATE USING (auth.uid() = id);
 
--- Projects: all authenticated users can read/write (small internal team)
-CREATE POLICY "projects_authenticated" ON public.projects FOR ALL USING (auth.role() = 'authenticated');
+-- Projects: owners have full access; others in same org can see (simplified for V1.1)
+CREATE POLICY "projects_owner_all" ON public.projects FOR ALL USING (auth.uid() = owner_id);
+CREATE POLICY "projects_read_all"  ON public.projects FOR SELECT USING (auth.role() = 'authenticated');
 
--- Tasks: all authenticated users can read/write
-CREATE POLICY "tasks_authenticated" ON public.tasks FOR ALL USING (auth.role() = 'authenticated');
+-- Tasks: users can manage tasks they created or are assigned to
+CREATE POLICY "tasks_manage_own"    ON public.tasks FOR ALL USING (auth.uid() = created_by OR auth.uid() = assignee_id);
+CREATE POLICY "tasks_view_project"  ON public.tasks FOR SELECT USING (auth.role() = 'authenticated');
 
 -- AI Conversations: users see only their own
 CREATE POLICY "ai_convs_own" ON public.ai_conversations FOR ALL USING (auth.uid() = user_id);
@@ -119,6 +141,10 @@ CREATE TABLE IF NOT EXISTS public.notes (
   created_at  timestamptz DEFAULT now() NOT NULL,
   updated_at  timestamptz DEFAULT now() NOT NULL
 );
+
+CREATE TRIGGER handle_notes_updated_at
+  BEFORE UPDATE ON public.notes
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_updated_at();
 
 CREATE INDEX IF NOT EXISTS notes_user_idx       ON public.notes(user_id);
 CREATE INDEX IF NOT EXISTS notes_project_idx    ON public.notes(project_id);
@@ -154,6 +180,10 @@ CREATE TABLE IF NOT EXISTS public.calendar_events (
   created_at  timestamptz DEFAULT now() NOT NULL,
   updated_at  timestamptz DEFAULT now() NOT NULL
 );
+
+CREATE TRIGGER handle_cal_events_updated_at
+  BEFORE UPDATE ON public.calendar_events
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_updated_at();
 
 CREATE INDEX IF NOT EXISTS cal_events_user_idx    ON public.calendar_events(user_id);
 CREATE INDEX IF NOT EXISTS cal_events_start_idx   ON public.calendar_events(start_at);

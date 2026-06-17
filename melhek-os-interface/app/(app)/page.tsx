@@ -5,9 +5,15 @@ import Link from 'next/link'
 import { useUser } from '@/hooks/useUser'
 import { useTasks } from '@/hooks/useTasks'
 import { useProjects } from '@/hooks/useProjects'
+import { useOpportunities } from '@/hooks/useOpportunities'
+import { useRevenue, formatETB } from '@/hooks/useRevenue'
 import { formatDate, isOverdue, isDueToday, getPriorityConfig, getStatusConfig, getProjectStatusConfig } from '@/lib/utils'
-import { CheckSquare, FolderKanban, AlertCircle, TrendingUp, ArrowRight, Zap, Clock } from 'lucide-react'
+import {
+  CheckSquare, FolderKanban, AlertCircle, TrendingUp, ArrowRight, Zap, Clock,
+  Target, Flame, DollarSign, Calendar, ChevronRight, Phone, MessageCircle, AlertTriangle
+} from 'lucide-react'
 
+// ─── KPI Card ─────────────────────────────────────────────────
 function KPICard({ title, value, sub, color, icon, href, loading }: {
   title: string; value: number; sub?: string; color: string
   icon: React.ReactNode; href?: string; loading?: boolean
@@ -32,6 +38,141 @@ function KPICard({ title, value, sub, color, icon, href, loading }: {
   return href ? <Link href={href}>{card}</Link> : card
 }
 
+// ─── Revenue Command Center ───────────────────────────────────
+function RevenueCommandCenter() {
+  const { opportunities, loading } = useOpportunities()
+  const { stats, dealsAtRisk, followUpsOverdue, pipelineValue } = useRevenue(opportunities)
+
+  const statusConfig = {
+    ahead:    { label: 'Ahead of Pace', color: '#00d084', bg: 'rgba(0,208,132,0.08)', ring: 'rgba(0,208,132,0.3)', glow: '#00d084' },
+    on_pace:  { label: 'On Pace',       color: '#ffcc00', bg: 'rgba(255,204,0,0.08)', ring: 'rgba(255,204,0,0.3)',   glow: '#ffcc00' },
+    behind:   { label: 'Behind Pace',   color: '#ff4444', bg: 'rgba(255,68,68,0.08)', ring: 'rgba(255,68,68,0.3)',   glow: '#ff4444' },
+  }[stats.status]
+
+  const circumference = 2 * Math.PI * 54 // r=54
+  const dashOffset = circumference * (1 - stats.progressPercent / 100)
+
+  return (
+    <div className="rounded-2xl p-6 relative overflow-hidden"
+      style={{
+        background: 'linear-gradient(135deg, rgba(0,0,0,0.6), rgba(1,42,45,0.4))',
+        border: '1px solid rgba(0,128,255,0.2)',
+      }}>
+      {/* Ambient glow */}
+      <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full pointer-events-none"
+        style={{ background: `radial-gradient(circle, ${statusConfig.glow}30, transparent 70%)` }} />
+
+      <div className="relative">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Target className="w-4 h-4" style={{ color: '#0080FF' }} />
+              <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--melhek-text-secondary)' }}>
+                Revenue Command Center
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full"
+                style={{ background: statusConfig.bg, color: statusConfig.color, border: `1px solid ${statusConfig.ring}` }}>
+                {statusConfig.label}
+              </span>
+              {stats.daysRemaining > 0 && (
+                <span className="text-xs" style={{ color: 'var(--melhek-text-tertiary)' }}>
+                  {stats.daysRemaining} days remaining
+                </span>
+              )}
+            </div>
+          </div>
+          <Link href="/pipeline"
+            className="flex items-center gap-1 text-xs font-medium transition-colors"
+            style={{ color: '#0080FF' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#00D4FF'}
+            onMouseLeave={e => e.currentTarget.style.color = '#0080FF'}>
+            Pipeline <ChevronRight className="w-3 h-3" />
+          </Link>
+        </div>
+
+        <div className="flex items-center gap-6 lg:gap-10">
+          {/* Circular Progress */}
+          <div className="relative flex-shrink-0 w-32 h-32">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 128 128">
+              {/* Track */}
+              <circle cx="64" cy="64" r="54" fill="none"
+                stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+              {/* Progress */}
+              <circle cx="64" cy="64" r="54" fill="none"
+                stroke={statusConfig.color} strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={loading ? circumference : dashOffset}
+                className="transition-all duration-1000 ease-out"
+                style={{ filter: `drop-shadow(0 0 6px ${statusConfig.color}80)` }} />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              {loading ? (
+                <div className="w-10 h-3 rounded shimmer" />
+              ) : (
+                <>
+                  <span className="text-2xl font-black tabular-nums" style={{ color: statusConfig.color }}>
+                    {Math.round(stats.progressPercent)}%
+                  </span>
+                  <span className="text-[10px] font-medium" style={{ color: 'var(--melhek-text-tertiary)' }}>
+                    of goal
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {[
+              { label: 'Goal',         value: formatETB(stats.goal),              color: 'var(--melhek-text-secondary)' },
+              { label: 'Closed',       value: formatETB(stats.closed),            color: '#00d084' },
+              { label: 'Remaining',    value: formatETB(stats.remaining),         color: stats.remaining > 0 ? '#ff9500' : '#00d084' },
+              { label: 'Daily Pace',   value: formatETB(Math.round(stats.dailyPaceRequired)), color: '#0080FF' },
+              { label: 'Weekly Target',value: formatETB(Math.round(stats.weeklyTarget)),       color: '#00D4FF' },
+              { label: 'Pipeline',     value: formatETB(Math.round(pipelineValue)), color: '#8b8bff' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="rounded-xl p-2.5"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <p className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--melhek-text-tertiary)' }}>{label}</p>
+                <p className="text-sm font-bold tabular-nums leading-tight" style={{ color }}>
+                  {loading ? <span className="w-12 h-3 rounded shimmer inline-block" /> : value}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Alerts row */}
+        {!loading && (dealsAtRisk.length > 0 || followUpsOverdue.length > 0) && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {followUpsOverdue.length > 0 && (
+              <Link href="/pipeline"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors hover:opacity-80"
+                style={{ background: 'rgba(255,68,68,0.1)', color: '#ff6666', border: '1px solid rgba(255,68,68,0.2)' }}>
+                <AlertTriangle className="w-3 h-3 animate-pulse" />
+                {followUpsOverdue.length} overdue follow-up{followUpsOverdue.length > 1 ? 's' : ''}
+              </Link>
+            )}
+            {dealsAtRisk.length > 0 && (
+              <Link href="/ceo"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors hover:opacity-80"
+                style={{ background: 'rgba(255,149,0,0.1)', color: '#ff9500', border: '1px solid rgba(255,149,0,0.2)' }}>
+                <Clock className="w-3 h-3" />
+                {dealsAtRisk.length} deal{dealsAtRisk.length > 1 ? 's' : ''} at risk
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Dashboard Page ───────────────────────────────────────────
 export default function DashboardPage() {
   const { profile } = useUser()
   const { tasks, loading: tasksLoading } = useTasks()
@@ -77,6 +218,28 @@ export default function DashboardPage() {
             <span>{brief}</span>
           </div>
         )}
+      </div>
+
+      {/* ── REVENUE COMMAND CENTER (above all KPIs) ── */}
+      <RevenueCommandCenter />
+
+      {/* Quick nav to revenue modules */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { href: '/pipeline', label: 'Pipeline', icon: TrendingUp, color: '#0080FF', desc: 'Manage deals' },
+          { href: '/ceo',      label: 'CEO Mode', icon: Flame,       color: '#ff6b35', desc: 'Daily mission' },
+          { href: '/proposals',label: 'Proposals',icon: Zap,          color: '#8b8bff', desc: 'Templates' },
+        ].map(({ href, label, icon: Icon, color, desc }) => (
+          <Link key={href} href={href}
+            className="glass rounded-2xl p-4 flex flex-col gap-2 lift-on-hover"
+            style={{ border: `1px solid ${color}20` }}>
+            <Icon className="w-5 h-5" style={{ color }} />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--melhek-text-primary)' }}>{label}</p>
+              <p className="text-xs" style={{ color: 'var(--melhek-text-tertiary)' }}>{desc}</p>
+            </div>
+          </Link>
+        ))}
       </div>
 
       {/* KPI Cards */}

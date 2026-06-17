@@ -6,11 +6,13 @@ import { useUser } from '@/hooks/useUser'
 import { useTasks } from '@/hooks/useTasks'
 import { useProjects } from '@/hooks/useProjects'
 import { useNotes } from '@/hooks/useNotes'
+import { useOpportunities } from '@/hooks/useOpportunities'
 import { renderMarkdown } from '@/lib/markdown'
 import { formatDateTime, getInitials } from '@/lib/utils'
 import {
   Send, Zap, Plus, Trash2, Loader2, Bot, User,
-  RefreshCw, FolderKanban, CheckSquare, FileText, X, ChevronDown
+  RefreshCw, FolderKanban, CheckSquare, FileText, X, ChevronDown,
+  TrendingUp, DollarSign, Flame
 } from 'lucide-react'
 import type { AIConversation, ChatMessage } from '@/types'
 
@@ -21,6 +23,16 @@ const SUGGESTIONS = [
   'Draft a project proposal',
   'Help me prioritize my work',
   'Analyze risks in my projects',
+]
+
+const REVENUE_SUGGESTIONS = [
+  'Give me my daily revenue briefing',
+  'Which deal should I close today?',
+  'List overdue follow-ups and what to say',
+  'What are my biggest revenue risks?',
+  'Write a follow-up WhatsApp message for a prospect',
+  'Give me a weekly revenue summary',
+  'What should my top 3 actions be today?',
 ]
 
 // ─── Context type config ──────────────────────────────────────
@@ -35,6 +47,10 @@ export default function AIPage() {
   const { profile } = useUser()
   const supabase = useRef(createClient()).current
   const mounted = useRef(true)
+
+  // Revenue Coach mode
+  const [revenueMode, setRevenueMode] = useState(false)
+  const { opportunities } = useOpportunities()
 
   // Chat state
   const [conversations, setConversations] = useState<AIConversation[]>([])
@@ -111,6 +127,23 @@ export default function AIPage() {
 
   // ─── Build context data string ─────────────────────────────
   const buildContextData = useCallback((): { type: typeof ctxType; data: string } | undefined => {
+    // If Revenue Coach mode, inject pipeline context
+    if (revenueMode) {
+      const wonTotal = opportunities.filter(o => o.stage === 'won').reduce((s, o) => s + o.potential_revenue, 0)
+      const activeDeals = opportunities.filter(o => !['won','lost'].includes(o.stage))
+      const today = new Date().toISOString().split('T')[0]
+      const overdueFollowUps = activeDeals.filter(o => o.next_action_date && o.next_action_date < today)
+      const pipelineData = `
+Revenue Goal: 300,000 ETB | Sprint: 84 days from June 17, 2026
+Revenue Closed (Won): ${wonTotal.toLocaleString()} ETB
+Revenue Remaining: ${(300000 - wonTotal).toLocaleString()} ETB
+Active Pipeline Deals: ${activeDeals.length}
+Overdue Follow-Ups: ${overdueFollowUps.length}
+Top Deals:\n${activeDeals.slice(0, 5).map(o => `- ${o.company_name}: ${((o.potential_revenue * o.probability)/100).toFixed(0)} ETB expected (${o.probability}% at ${o.stage}), next action: ${o.next_action ?? 'none'}, next date: ${o.next_action_date ?? 'none'}`).join('\n')}
+Overdue Follow-Ups:\n${overdueFollowUps.map(o => `- ${o.company_name}: was due ${o.next_action_date}, action: ${o.next_action ?? 'call'}`).join('\n') || 'None'}
+      `.trim()
+      return { type: 'general', data: pipelineData }
+    }
     if (ctxType === 'general') return undefined
     if (ctxType === 'project' && ctxId) {
       const p = projects.find(p => p.id === ctxId)
@@ -125,7 +158,7 @@ export default function AIPage() {
       if (n) return { type: 'note', data: `Note: ${n.title}\n\n${n.content.slice(0, 800)}` }
     }
     return undefined
-  }, [ctxType, ctxId, projects, tasks, notes])
+  }, [revenueMode, opportunities, ctxType, ctxId, projects, tasks, notes])
 
   // ─── Send message ──────────────────────────────────────────
   const sendMessage = useCallback(async (overrideInput?: string) => {
@@ -151,6 +184,7 @@ export default function AIPage() {
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           context: buildContextData(),
+          revenueMode,
         }),
       })
 
@@ -336,8 +370,20 @@ export default function AIPage() {
             <Bot className="w-4 h-4" />
           </button>
           <h1 className="text-sm font-semibold flex-1" style={{ color: 'var(--melhek-text-primary)' }}>
-            ARIA — Melhek AI
+            {revenueMode ? '⚡ ARIA — Revenue Coach' : 'ARIA — Melhek AI'}
           </h1>
+
+          {/* Revenue Coach Toggle */}
+          <button onClick={() => setRevenueMode(v => !v)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all mr-1"
+            style={{
+              background: revenueMode ? 'rgba(0,208,132,0.15)' : 'rgba(255,255,255,0.05)',
+              color: revenueMode ? '#00d084' : 'var(--melhek-text-tertiary)',
+              border: `1px solid ${revenueMode ? 'rgba(0,208,132,0.3)' : 'rgba(255,255,255,0.08)'}`,
+            }}>
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{revenueMode ? 'Revenue Coach' : 'Revenue Mode'}</span>
+          </button>
 
           {/* Context picker */}
           <div className="relative">
@@ -415,16 +461,30 @@ export default function AIPage() {
                 <img src="/logo.jpg" alt="Melhek Logo" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h2 className="text-lg font-bold" style={{ color: 'var(--melhek-text-primary)' }}>ARIA</h2>
+                <h2 className="text-lg font-bold" style={{ color: 'var(--melhek-text-primary)' }}>
+                  {revenueMode ? '⚡ ARIA Revenue Coach' : 'ARIA'}
+                </h2>
                 <p className="text-sm mt-1" style={{ color: 'var(--melhek-text-secondary)' }}>
-                  Ask anything — tasks, projects, strategy, or drafting.
+                  {revenueMode
+                    ? 'Tactical revenue intelligence. Ask me about your pipeline, deals, and what to do next.'
+                    : 'Ask anything — tasks, projects, strategy, or drafting.'}
                 </p>
               </div>
+              {revenueMode && (
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium"
+                  style={{ background: 'rgba(0,208,132,0.08)', border: '1px solid rgba(0,208,132,0.2)', color: '#00d084' }}>
+                  <Flame className="w-3.5 h-3.5" /> Revenue Coach Mode Active — Pipeline data injected
+                </div>
+              )}
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                {SUGGESTIONS.map(s => (
+                {(revenueMode ? REVENUE_SUGGESTIONS : SUGGESTIONS).map(s => (
                   <button key={s} onClick={() => sendMessage(s)}
                     className="px-3 py-1.5 rounded-xl text-xs transition-all"
-                    style={{ background: 'rgba(0,128,255,0.08)', border: '1px solid rgba(0,128,255,0.2)', color: '#00D4FF' }}>
+                    style={{
+                      background: revenueMode ? 'rgba(0,208,132,0.08)' : 'rgba(0,128,255,0.08)',
+                      border: `1px solid ${revenueMode ? 'rgba(0,208,132,0.2)' : 'rgba(0,128,255,0.2)'}`,
+                      color: revenueMode ? '#00d084' : '#00D4FF'
+                    }}>
                     {s}
                   </button>
                 ))}

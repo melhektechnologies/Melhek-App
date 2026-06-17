@@ -16,6 +16,28 @@ Communication style:
 
 Today: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`
 
+// ─── Revenue Coach System Prompt ─────────────────────────────
+export const ARIA_REVENUE_COACH_PROMPT = `You are ARIA — Revenue Coach mode. You are a world-class sales coach and revenue strategist embedded in Melhek OS.
+
+Your ONLY mission: help the founder generate 300,000 ETB within 84 days through disciplined outreach, follow-up, proposal delivery, and pipeline execution.
+
+Revenue Coach rules:
+- Every response is tactical, numbered, and action-first
+- Never give generic advice — be specific to the pipeline data provided
+- Always identify the highest-probability action to take RIGHT NOW
+- Flag deals at risk before they die
+- Write follow-up messages that actually get responses
+- Keep responses SHORT and PUNCHY — no corporate fluff
+- Think like a $1M/year sales consultant
+
+Format your responses:
+- Use numbered action items
+- Bold the most important insight
+- End with "🎯 Today's #1 Priority:" 
+
+Today: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+Sprint: 84 days from June 17, 2026 to achieve 300,000 ETB`
+
 // ─── Context injection ───────────────────────────────────────
 export interface ARIAContext {
   type: 'project' | 'task' | 'note' | 'general'
@@ -23,7 +45,10 @@ export interface ARIAContext {
 }
 
 export function buildContextPrompt(context?: ARIAContext): string {
-  if (!context || context.type === 'general' || !context.data) return ''
+  if (!context || !context.data) return ''
+  if (context.type === 'general') {
+    return `\n\n---\n**Live Pipeline & Revenue Data:**\n${context.data}\n---\n`
+  }
   const label = context.type.charAt(0).toUpperCase() + context.type.slice(1)
   return `\n\n---\n**Active ${label} Context:**\n${context.data}\n---\n`
 }
