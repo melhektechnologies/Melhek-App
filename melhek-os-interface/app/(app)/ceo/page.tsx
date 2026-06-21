@@ -7,7 +7,7 @@ import {
   DollarSign, Clock, Star, Edit3
 } from 'lucide-react'
 import { useOpportunities } from '@/hooks/useOpportunities'
-import { useScorecard } from '@/hooks/useScorecard'
+import { useScorecard, ScorecardField } from '@/hooks/useScorecard'
 import { useRevenue, formatETB, noContactLabel } from '@/hooks/useRevenue'
 import type { Opportunity } from '@/types'
 
@@ -48,7 +48,8 @@ function MissionBanner({ stats }: { stats: ReturnType<typeof useRevenue>['stats'
 
 // ─── Scorecard quick increment widget ────────────────────────
 function ScorecardQuick() {
-  const { today, increment, decrement, streak, dailyCompletion } = useScorecard()
+  const { today, increment, decrement, streak, dailyCompletion, updateField } = useScorecard()
+  const [tempValues, setTempValues] = useState<Partial<Record<ScorecardField, string>>>({})
 
   const metrics = [
     { label: 'Calls Made', key: 'calls_made' as const, icon: Phone, color: '#00d084' },
@@ -100,9 +101,34 @@ function ScorecardQuick() {
               <button onClick={() => decrement(key)}
                 className="w-5 h-5 rounded flex items-center justify-center text-xs font-bold flex-shrink-0 hover:bg-white/10 transition-colors"
                 style={{ color: 'var(--melhek-text-tertiary)' }}>−</button>
-              <span className="flex-1 text-center text-base font-bold tabular-nums" style={{ color }}>
-                {today?.[key] ?? 0}
-              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={tempValues[key] !== undefined ? tempValues[key] : (today?.[key] ?? 0)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '')
+                  setTempValues(prev => ({ ...prev, [key]: val }))
+                }}
+                onBlur={() => {
+                  const valStr = tempValues[key]
+                  if (valStr !== undefined && valStr !== '') {
+                    updateField(key, parseInt(valStr, 10) || 0)
+                  }
+                  setTempValues(prev => {
+                    const copy = { ...prev }
+                    delete copy[key]
+                    return copy
+                  })
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur()
+                  }
+                }}
+                className="w-full min-w-0 flex-1 text-center text-base font-bold bg-transparent outline-none border-none focus:ring-0 focus:outline-none focus:bg-white/5 rounded p-0.5 tabular-nums transition-colors"
+                style={{ color }}
+              />
               <button onClick={() => increment(key)}
                 className="w-5 h-5 rounded flex items-center justify-center text-xs font-bold flex-shrink-0 hover:bg-white/10 transition-colors"
                 style={{ color }}>+</button>

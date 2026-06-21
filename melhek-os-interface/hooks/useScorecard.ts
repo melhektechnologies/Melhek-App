@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { DailyScorecard } from '@/types'
 
-type ScorecardField = 'calls_made' | 'followups_sent' | 'meetings_booked' | 'proposals_sent' | 'deals_closed' | 'revenue_generated'
+export type ScorecardField = 'calls_made' | 'followups_sent' | 'meetings_booked' | 'proposals_sent' | 'deals_closed' | 'revenue_generated'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
@@ -83,13 +83,13 @@ export function useScorecard() {
 
   useEffect(() => { fetchScorecard() }, [fetchScorecard])
 
-  // Increment a counter
-  const increment = useCallback(async (field: ScorecardField, amount: number = 1) => {
+  // Update a counter directly
+  const updateField = useCallback(async (field: ScorecardField, value: number) => {
     if (!today) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const newValue = (today[field] as number) + amount
+    const newValue = Math.max(0, value)
     const optimisticRecord = { ...today, [field]: newValue }
     setToday(optimisticRecord)
     setHistory(prev => prev.map(r => r.id === today.id ? optimisticRecord : r))
@@ -107,13 +107,20 @@ export function useScorecard() {
     }
   }, [today, supabase])
 
+  // Increment a counter
+  const increment = useCallback(async (field: ScorecardField, amount: number = 1) => {
+    if (!today) return
+    const current = today[field] as number
+    return updateField(field, current + amount)
+  }, [today, updateField])
+
   // Decrement (min 0)
   const decrement = useCallback(async (field: ScorecardField) => {
     if (!today) return
     const current = today[field] as number
     if (current <= 0) return
-    return increment(field, -1)
-  }, [today, increment])
+    return updateField(field, current - 1)
+  }, [today, updateField])
 
   // Save reflection
   const saveReflection = useCallback(async (text: string) => {
@@ -151,7 +158,7 @@ export function useScorecard() {
       ))
     : 0
 
-  return { today, history, loading, streak, weeklyTotals, dailyCompletion, increment, decrement, saveReflection, refetch: fetchScorecard }
+  return { today, history, loading, streak, weeklyTotals, dailyCompletion, increment, decrement, updateField, saveReflection, refetch: fetchScorecard }
 }
 
 function isThisWeek(dateStr: string): boolean {
